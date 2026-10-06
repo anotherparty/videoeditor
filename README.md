@@ -30,6 +30,8 @@ Projects live in `~/Projects/Reels/<name>/` (older folders can be listed in `Ree
 | `editplan.py` | turns the plan into output-time edits |
 | `brollcard.swift` | screenshot → 9:16 or split card, OCR'd highlighter marks |
 | `stagereel.swift` | the renderer (captions, graphics, split screen, title/end cards) |
+| `normalize.swift` | brings speech up to reel loudness (default -15 dBFS) with a peak limiter |
+| `loudness.swift` | prints peak / RMS levels of any video |
 | `ocr.swift`, `grabframes.swift`, `sheet.swift`, `cover.swift`, `compress.swift` | helpers |
 | `registry/` | people, places, emoji the planner knows (`people.json` is private; see `people.example.json`) |
 

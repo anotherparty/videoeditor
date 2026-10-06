@@ -15,7 +15,7 @@ PROJECT_DIR/project.json (paths relative to PROJECT_DIR):
    "make_full": true, "full_tag", "reels": [{"name","window","tag","on"}], "posting": {...}}
 Writes work/ (transcript, plans, off-lists), out/NAME.mp4, out/phone/NAME.mp4, status.json, work/pipeline.log.
 Steps per video: dead-air cut -> captions -> autoplan (labels, places, emoji, stock, screenshots) -> editplan
--> stagereel (face-clear captions, split/full B-roll) -> phone copy. Each output is skipped if it exists
+-> stagereel (face-clear captions, split/full B-roll) -> normalize (speech to reel loudness, limiter) -> phone copy. Each output is skipped if it exists
 unless --force or its plan/settings changed (the dashboard deletes the output when you toggle an item).
 """
 import argparse, json, re, subprocess, sys, time
@@ -107,11 +107,16 @@ class Run:
         if plan_only: return
         self.say("rendering", name)
         c = self.cfg
-        self.sh(["swift", HERE / "stagereel.swift", "--in", self.p / c["video"], "--out", out, "--cuts", cuts,
+        raw = self.work / f"{name}.raw.mp4"
+        self.sh(["swift", HERE / "stagereel.swift", "--in", self.p / c["video"], "--out", raw, "--cuts", cuts,
                  "--cues", self.work / f"{name}.cues.json", "--edit", self.work / f"{name}.edit.json",
                  "--style", "btb", "--cap-style", style, "--date", c.get("date", ""), "--tag", tag or c.get("name", ""),
                  "--sticker", c.get("sticker", c.get("name", "")), "--cta", c.get("cta", "Read the Substack"),
                  "--handle", c.get("handle", "adamrobertswrites.substack.com")])
+        # phone recordings are far too quiet for Instagram: bring speech up to reel level with a peak limiter
+        self.say("fixing the sound level", name)
+        self.sh(["swift", HERE / "normalize.swift", raw, out, "--target", str(c.get("loudness", -15))])
+        raw.unlink()
         self.say("making phone copy", name)
         self.sh(["swift", COMPRESS, out, self.out / "phone" / f"{name}.mp4", "1000000" if name == "full" else "1200000"])
         self.status["done"].append(name)
