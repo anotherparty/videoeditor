@@ -730,8 +730,21 @@ func capBox(_ text: String) -> CALayer {
     return textCard(a, bg: NSColor(calibratedWhite: 0.97, alpha: 0.96), padX: 30, padY: 16, corner: 26, maxW: CGFloat(W) * 0.8)
 }
 // the free zone for graphics: wherever captions are NOT (captions high -> graphics low, and vice versa)
-func freeZoneCenterY(_ h: CGFloat) -> CGFloat {
-    BTB_BOTTOM > BTB_LOW + 1 ? CGFloat(H) * 0.13 + h / 2 : CGFloat(H) - BAND_BOTTOM - 36 - h / 2
+// Never on the face: try the zone captions aren't using; if the head reaches into it, stack under the captions;
+// if that won't fit either, take the caption spot and pause captions for this window (NOCAPS).
+func freeZoneCenterY(_ h: CGFloat, start: Double = 0, end: Double = 0) -> CGFloat {
+    let chinPx = FACE.chin * CGFloat(H), headPx = FACE.headTop * CGFloat(H), gap: CGFloat = 20
+    if BTB_BOTTOM > BTB_LOW + 1 {                                  // captions are above the head
+        let low = CGFloat(H) * 0.13 + h / 2                        // CA y (from bottom)
+        if CGFloat(H) - (low + h / 2) >= chinPx + gap || !FACE.found { return low }
+        let underTop = CGFloat(H) - BTB_BOTTOM + 16                // px from top, just under the caption block
+        if underTop + h <= headPx - gap { return CGFloat(H) - underTop - h / 2 }
+        NOCAPS.append((start, end)); return BTB_BOTTOM + BTB_LINE      // sit where the captions were
+    } else {                                                       // captions are low (below the chin)
+        let high = CGFloat(H) - BAND_BOTTOM - 36 - h / 2
+        if BAND_BOTTOM + 36 + h <= headPx - gap || !FACE.found { return high }
+        NOCAPS.append((start, end)); return BTB_BOTTOM + BTB_LINE
+    }
 }
 func slideIn(_ l: CALayer, at t: Double, dx: CGFloat) {
     let a = CABasicAnimation(keyPath: "position.x"); a.fromValue = l.position.x + dx; a.toValue = l.position.x
@@ -781,7 +794,7 @@ func makeGraphics(_ g: [String:Any], total: Double, contentDur: Double) -> [CALa
             a.append(NSAttributedString(string: "\n" + role, attributes: [.font: NSFont(name: "AvenirNext-DemiBold", size: 34) ?? font(34, true), .foregroundColor: btbMint]))
         }
         let l = textCard(a, bg: NSColor(calibratedWhite: 0.04, alpha: 0.9), padX: 26, padY: 14, corner: 10, maxW: CGFloat(W) * 0.7, bar: brandRed)
-        l.frame.origin = CGPoint(x: 40, y: freeZoneCenterY(l.bounds.height) - l.bounds.height / 2)
+        l.frame.origin = CGPoint(x: 40, y: freeZoneCenterY(l.bounds.height, start: st, end: en) - l.bounds.height / 2)
         addFadeWindow(l, showStart: st, showEnd: en, total: total, fade: 0.2); slideIn(l, at: st, dx: -420); out.append(l)
     case "place":   // place / date card: pin + PLACE, year in mint
         let a = NSMutableAttributedString(string: "📍 " + (g["place"] as? String ?? "").uppercased(),
@@ -790,7 +803,7 @@ func makeGraphics(_ g: [String:Any], total: Double, contentDur: Double) -> [CALa
             a.append(NSAttributedString(string: "  " + yr, attributes: [.font: btbFont(78), .foregroundColor: btbMint]))
         }
         let l = textCard(a, bg: NSColor(calibratedWhite: 0.04, alpha: 0.82), padX: 30, padY: 12, corner: 18, maxW: CGFloat(W) * 0.9)
-        l.frame.origin = CGPoint(x: (CGFloat(W) - l.bounds.width) / 2, y: freeZoneCenterY(l.bounds.height) - l.bounds.height / 2)
+        l.frame.origin = CGPoint(x: (CGFloat(W) - l.bounds.width) / 2, y: freeZoneCenterY(l.bounds.height, start: st, end: en) - l.bounds.height / 2)
         addFadeWindow(l, showStart: st, showEnd: en, total: total, fade: 0.15); addPop(l, at: st, from: 1.4); out.append(l)
     case "emoji":   // big emoji pop beside the head, never on it
         let e = g["emoji"] as? String ?? "✨", sz: CGFloat = 190
