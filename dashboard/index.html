@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel Studio</title>
+<style>
+:root{
+  --bg:#f7f1e6; --panel:#fffdf8; --ink:#1d1a17; --muted:#6f665c; --line:#e5dccd;
+  --red:#b22e26; --mint:#33f2c7; --purple:#8c2ef2; --ok:#1f8a5b; --warn:#b7791f;
+  --label:#2f6fdb; --place:#c2410c; --emoji:#a16207; --broll:#7c3aed; --stock:#0f766e;
+  --r:14px; --shadow:0 1px 2px rgba(40,30,20,.06),0 4px 16px rgba(40,30,20,.06);
+}
+*{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Avenir Next","Segoe UI",sans-serif}
+button,input,select{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+aside{border-right:1px solid var(--line);padding:20px 14px;position:sticky;top:0;height:100vh;overflow:auto;background:#f3ebdd}
+.brand{display:flex;align-items:baseline;gap:8px;margin:0 6px 18px}
+.brand b{font:800 22px/1 "Avenir Next",sans-serif;color:var(--red);letter-spacing:-.3px}
+.brand span{color:var(--muted);font-size:13px}
+.proj{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 12px;border-radius:10px;cursor:pointer;margin-bottom:2px}
+.proj:hover{background:#ebe1d0} .proj.on{background:var(--ink);color:#fff}
+.proj small{display:block;opacity:.65;font-size:12px}
+.new{display:flex;gap:6px;margin:14px 4px 0}
+.new input{flex:1;min-width:0;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 10px}
+main{padding:26px 32px 80px;max-width:1180px}
+h1{font:800 28px/1.1 "Avenir Next",sans-serif;margin:0;letter-spacing:-.4px}
+h2{font:700 13px/1 "Avenir Next",sans-serif;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);margin:30px 0 12px}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:4px 11px;font-size:12.5px;font-weight:600;background:#ece3d3}
+.pill.running{background:#fdf0d5;color:var(--warn)} .pill.done{background:#dcf3e8;color:var(--ok)}
+.pill.failed,.pill.err{background:#fbe0dd;color:var(--red)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.running .dot{animation:pulse 1s infinite} @keyframes pulse{50%{opacity:.25}}
+.btn{border:0;border-radius:10px;padding:9px 15px;font-weight:650;cursor:pointer;background:#ece3d3}
+.btn:hover{filter:brightness(.96)} .btn.primary{background:var(--red);color:#fff} .btn.dark{background:var(--ink);color:#fff}
+.btn.small{padding:5px 10px;font-size:13px} .btn:disabled{opacity:.45;cursor:default}
+.spacer{flex:1}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:18px}
+.drop{border:2px dashed #d4c7b2;border-radius:var(--r);padding:22px;text-align:center;color:var(--muted);transition:.15s;background:#fffaf1}
+.drop.over{border-color:var(--red);background:#fff1ea;color:var(--red)}
+.drop b{color:var(--ink)}
+.files{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;justify-content:center}
+.files img{height:74px;border-radius:8px;border:1px solid var(--line)}
+.chipv{font-size:13px;background:#ece3d3;border-radius:8px;padding:6px 10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+label.f{display:block;font-size:12.5px;font-weight:650;color:var(--muted);margin-bottom:5px}
+.in{width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 11px}
+.in:focus{outline:2px solid var(--mint);border-color:transparent}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:4px 11px;font-size:13px;cursor:pointer}
+.chip:hover{border-color:var(--red);color:var(--red)}
+.styles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.sty{border:2px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;background:#fff;text-align:center}
+.sty.on{border-color:var(--red)}
+.sty .demo{height:62px;border-radius:8px;background:linear-gradient(#cfc6b8,#9d948a);display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+.d-btb{font:900 19px "Avenir Next";color:#fff;text-shadow:2px 3px 0 #000;letter-spacing:.5px}
+.d-btb i{font-style:normal;background:var(--purple);color:var(--mint);padding:0 4px;border-radius:4px}
+.d-box{background:#fff;color:#111;border-radius:9px;padding:3px 9px;font:500 14px Helvetica}
+.d-mono{background:#0a0a0a;color:#fff;border-radius:5px;padding:3px 9px;font:700 13px Menlo,monospace;letter-spacing:1.5px}
+.sty small{font-size:12px;color:var(--muted)}
+.vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
+.vid{display:flex;flex-direction:column;gap:12px}
+.vid.off{opacity:.55}
+.vhead{display:flex;align-items:center;gap:8px}
+.vhead input{flex:1;font-weight:700;border:1px solid transparent;background:none;border-radius:8px;padding:4px 6px;margin-left:-6px}
+.vhead input:hover,.vhead input:focus{border-color:var(--line);background:#fff}
+.player{display:flex;gap:12px}
+video{width:150px;aspect-ratio:9/16;border-radius:10px;background:#1d1a17;object-fit:cover;flex:none}
+.ph{width:150px;aspect-ratio:9/16;border-radius:10px;background:#ece3d3;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:10px;flex:none}
+.meta{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px;min-width:0}
+.meta a{color:var(--ink);font-weight:600}
+.timeline{position:relative;height:26px;background:#f1e9db;border-radius:7px;overflow:hidden}
+.tl{position:absolute;top:3px;bottom:3px;border-radius:4px;min-width:5px;opacity:.9}
+.tl.off{opacity:.22}
+.plan{max-height:220px;overflow:auto;border-top:1px solid var(--line);padding-top:6px}
+.it{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0}
+.it .k{width:9px;height:9px;border-radius:3px;flex:none}
+.it .t{color:var(--muted);font-variant-numeric:tabular-nums;width:40px;flex:none}
+.it .w{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.it.off .w{text-decoration:line-through;color:var(--muted)}
+.sw{position:relative;width:32px;height:18px;flex:none;cursor:pointer}
+.sw input{opacity:0;position:absolute;inset:0;cursor:pointer;margin:0}
+.sw span{position:absolute;inset:0;border-radius:99px;background:#d6ccbc;transition:.15s;pointer-events:none}
+.sw span:after{content:"";position:absolute;width:14px;height:14px;left:2px;top:2px;border-radius:50%;background:#fff;transition:.15s}
+.sw input:checked+span{background:var(--ok)} .sw input:checked+span:after{left:16px}
+.post{display:flex;gap:6px;flex-wrap:wrap}
+.pb{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 9px;font-size:12.5px;cursor:pointer}
+.pb.done{background:#dcf3e8;border-color:#bfe6d3;color:var(--ok);font-weight:650}
+.note{width:100%;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12.5px;background:#fff}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+pre.log{background:#1d1a17;color:#e9e3d8;border-radius:12px;padding:12px 14px;font:12px/1.5 Menlo,monospace;white-space:pre-wrap;max-height:200px;overflow:auto;margin:0}
+.empty{color:var(--muted);text-align:center;padding:60px 20px}
+.err{color:var(--red);font-size:13px}
+@media (max-width:820px){.app{grid-template-columns:1fr} aside{position:static;height:auto} main{padding:18px 16px 60px} .grid2,.styles{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><b>Reel Studio</b><span>Another Party</span></div>
+    <div id="plist"></div>
+    <form class="new" id="newf"><input id="newname" placeholder="New project name"><button class="btn small dark">Add</button></form>
+  </aside>
+  <main id="main"><div class="empty">Pick a project on the left, or start a new one.</div></main>
+</div>
+<script>
+const COLORS={label:'var(--label)',place:'var(--place)',emoji:'var(--emoji)',broll:'var(--broll)',stock:'var(--stock)'};
+const $=s=>document.querySelector(s);
+let cur=null, data=null, timer=null, editing=false;
+const api=(p,o={})=>fetch(p,{headers:{'Content-Type':'application/json'},...o}).then(r=>r.json());
+const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b||{})});
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const kind=it=>it.type==='broll'?(it.id.startsWith('stock')?'stock':'broll'):it.type;
+const fmt=t=>{t=Math.max(0,t);return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0')};
+
+async function loadList(){
+  const ps=await api('/api/projects');
+  $('#plist').innerHTML=ps.map(p=>`<button class="proj ${p.id===cur?'on':''}" data-id="${p.id}">${esc(p.name)}
+    <small>${p.state==='running'?'● rendering':p.videos+' video'+(p.videos===1?'':'s')}</small></button>`).join('')||'<div class="chipv">No projects yet</div>';
+  document.querySelectorAll('.proj').forEach(b=>b.onclick=()=>open(b.dataset.id));
+  if(!cur&&ps.length) open(ps[0].id);
+}
+$('#newf').onsubmit=async e=>{e.preventDefault();const n=$('#newname').value.trim();if(!n)return;
+  const r=await post('/api/projects',{name:n});$('#newname').value='';cur=r.id;await loadList();open(r.id)};
+
+async function open(id){cur=id;try{localStorage.setItem('reelstudio.cur',id)}catch(e){}
+  document.querySelectorAll('.proj').forEach(b=>b.classList.toggle('on',b.dataset.id===id));await refresh(true)}
+
+async function refresh(full){
+  if(!cur)return; data=await api('/api/p/'+cur);
+  if(full||!editing) render();
+  clearTimeout(timer); timer=setTimeout(()=>refresh(false), data.running?2500:8000);
+}
+
+function render(){
+  const d=data,c=d.cfg,st=d.status||{};
+  const state=d.running?'running':(st.state||'idle');
+  const pill=`<span class="pill ${state.startsWith('done')?'done':state}"><span class="dot"></span>${
+    d.running?`${esc(st.job||'')} ${esc(st.step||'working')}`:state==='done'?'All videos ready':esc(state)}</span>`;
+  const shots=(c.shots||[]).map(s=>`<img src="/files/${d.id}/${encodeURI(s)}" title="${esc(s)}">`).join('');
+  const sug=(d.suggestions||[]).map(s=>`<button class="chip" data-sug="${esc(s)}">${esc(s)}</button>`).join('');
+  $('#main').innerHTML=`
+  <div class="top"><h1>${esc(c.name)}</h1>${pill}<span class="spacer"></span>
+    ${d.running?`<button class="btn" id="stop">Stop</button>`:''}
+    <button class="btn" id="repick" ${d.running||!c.video?'disabled':''} title="Let the picker choose reels again">Re-pick reels</button>
+    <button class="btn primary" id="go" ${d.running||!c.video?'disabled':''}>${(d.outputs||[]).some(o=>o.url)?'Render changes':'Make the videos'}</button></div>
+  ${(st.errors||[]).length?`<p class="err">${st.errors.map(esc).join('<br>')}</p>`:''}
+
+  <h2>1 · Footage</h2>
+  <div class="drop" id="drop"><b>Drop the video here</b>, plus any screenshots (articles, posts, letters) to show as B-roll.
+    <div class="files">${c.video?`<span class="chipv">🎬 ${esc(c.video.split('/').pop())}</span>`:''}${shots}</div>
+    <input type="file" id="pick" multiple accept="video/*,image/*" hidden>
+    <div style="margin-top:10px"><button class="btn small" id="browse">Choose files</button></div></div>
+
+  <h2>2 · The look</h2>
+  <div class="card">
+    <div class="grid2">
+      <div><label class="f">Title card (top of every video)</label><input class="in" data-k="sticker" value="${esc(c.sticker)}" placeholder="Something that stops the scroll">
+        <div class="chips">${sug||(c.video?(d.has_transcript?'':'<span class="chipv">Listening to the video for title ideas…</span>'):'')}</div></div>
+      <div><label class="f">Date on the card</label><input class="in" data-k="date" value="${esc(c.date)}"></div>
+      <div><label class="f">End card says</label><input class="in" data-k="cta" value="${esc(c.cta)}"></div>
+      <div><label class="f">Link on the end card</label><input class="in" data-k="handle" value="${esc(c.handle)}"></div>
+    </div>
+    <label class="f" style="margin-top:16px">Captions</label>
+    <div class="styles">
+      ${[['btb','<span class="d-btb">SO A <i>MAJOR</i></span>','Books Through Bars'],
+         ['box','<span class="d-box">So a major shout out</span>','White box'],
+         ['mono','<span class="d-mono">SO A MAJOR</span>','Typewriter']].map(([k,demo,n])=>
+        `<div class="sty ${c.cap_style===k?'on':''}" data-sty="${k}"><div class="demo">${demo}</div><small>${n}</small></div>`).join('')}
+    </div>
+    <p style="font-size:12.5px;color:var(--muted);margin:10px 0 0">Captions always stay off your face. During split-screen they sit on the seam in a white box.</p>
+  </div>
+
+  <h2>3 · Videos</h2>
+  <div class="legend">${Object.entries({label:'Name label',place:'Place card',emoji:'Emoji',broll:'Screenshot',stock:'Stock footage'}).map(([k,n])=>
+    `<span><i class="k" style="width:9px;height:9px;border-radius:3px;background:${COLORS[k]}"></i>${n}</span>`).join('')}</div>
+  <div class="vids" style="margin-top:12px">${(d.outputs||[]).map(vidCard).join('')||'<div class="chipv">Reels show up here after the first render.</div>'}</div>
+
+  ${d.log?`<h2>Log</h2><pre class="log">${esc(d.log)}</pre>`:''}`;
+  wire();
+}
+
+function vidCard(o){
+  const plan=o.plan||[], end=Math.max(1,...plan.map(i=>i.src[1]),
+    o.window?parseFloat(o.window.split('-')[1]):1), start=o.window?parseFloat(o.window.split('-')[0]):0;
+  const span=Math.max(1,end-start);
+  const tl=plan.map(i=>`<div class="tl ${i.on?'':'off'}" title="${esc(i.why)}" style="left:${(i.src[0]-start)/span*100}%;width:${(i.src[1]-i.src[0])/span*100}%;background:${COLORS[kind(i)]}"></div>`).join('');
+  const items=plan.map(i=>`<div class="it ${i.on?'':'off'}"><i class="k" style="background:${COLORS[kind(i)]}"></i>
+    <span class="t">${fmt(i.src[0]-start)}</span><span class="w" title="${esc(i.why)}">${esc(label(i))}</span>
+    <label class="sw"><input type="checkbox" data-tog="${esc(i.id)}" data-v="${o.name}" ${i.on?'checked':''}><span></span></label></div>`).join('');
+  const P=o.posting||{};
+  const plat=[['instagram','Instagram'],['facebook','Facebook'],['youtube','YouTube']].map(([k,n])=>
+    `<button class="pb ${P[k]?'done':''}" data-post="${k}" data-v="${o.name}">${P[k]?'✓ ':''}${n}${P[k]?' · '+esc(P[k]):''}</button>`).join('');
+  const src=o.phone||o.url;
+  return `<div class="card vid ${o.on?'':'off'}">
+    <div class="vhead">${o.name==='full'?`<b style="flex:1">Full video</b>`:`<input value="${esc(o.tag)}" data-tag="${o.name}" title="Title tag for this reel">
+      <label class="sw" title="Make this reel"><input type="checkbox" data-reel="${o.name}" ${o.on?'checked':''}><span></span></label>`}</div>
+    <div class="player">${src?`<video src="${src}#t=0.5" controls preload="metadata" playsinline></video>`:`<div class="ph">${o.on?'Not rendered yet':'Switched off'}</div>`}
+      <div class="meta">${o.window?`<span>From ${fmt(start)} to ${fmt(end)}</span>`:''}
+        ${o.url?`<a href="${o.url}?dl=1">Download full quality</a><span>${o.mb} MB · for Instagram upload</span>`:''}
+        ${o.phone?`<a href="${o.phone}?dl=1">Download phone copy</a><span>${o.phone_mb} MB · for texting / review</span>`:''}
+        <span>${plan.filter(i=>i.on).length} graphics planned</span></div></div>
+    ${plan.length?`<div class="timeline">${tl}</div><div class="plan">${items}</div>`:''}
+    <div><label class="f">Posted</label><div class="post">${plat}</div>
+      <input class="note" style="margin-top:6px" placeholder="Waiting on… (e.g. Craig's OK)" data-note="${o.name}" value="${esc(P.note||'')}"></div>
+  </div>`;
+}
+function label(i){
+  if(i.type==='label')return `${i.name} · ${i.role}`;
+  if(i.type==='place')return `📍 ${i.place} ${i.year||''}`;
+  if(i.type==='emoji')return `${i.emoji} at ${i.why}`;
+  return i.why;
+}
+
+function wire(){
+  const d=data;
+  $('#go')&&($('#go').onclick=async()=>{await post(`/api/p/${cur}/render`);refresh(true)});
+  $('#repick')&&($('#repick').onclick=async()=>{await post(`/api/p/${cur}/render`,{pick:true});refresh(true)});
+  $('#stop')&&($('#stop').onclick=async()=>{await post(`/api/p/${cur}/stop`);refresh(true)});
+  document.querySelectorAll('[data-k]').forEach(el=>{
+    el.onfocus=()=>editing=true;
+    el.onblur=async()=>{editing=false;await post(`/api/p/${cur}/settings`,{[el.dataset.k]:el.value});refresh(false)}});
+  document.querySelectorAll('[data-sug]').forEach(b=>b.onclick=async()=>{
+    await post(`/api/p/${cur}/settings`,{sticker:b.dataset.sug});refresh(true)});
+  document.querySelectorAll('[data-sty]').forEach(b=>b.onclick=async()=>{
+    await post(`/api/p/${cur}/settings`,{cap_style:b.dataset.sty});refresh(true)});
+  document.querySelectorAll('[data-tog]').forEach(b=>b.onchange=async()=>{
+    await post(`/api/p/${cur}/toggle`,{video:b.dataset.v,id:b.dataset.tog,on:b.checked});refresh(true)});
+  document.querySelectorAll('[data-reel]').forEach(b=>b.onchange=async()=>{
+    await post(`/api/p/${cur}/reel`,{name:b.dataset.reel,on:b.checked});refresh(true)});
+  document.querySelectorAll('[data-tag]').forEach(el=>{el.onfocus=()=>editing=true;
+    el.onblur=async()=>{editing=false;await post(`/api/p/${cur}/reel`,{name:el.dataset.tag,tag:el.value});refresh(false)}});
+  document.querySelectorAll('[data-post]').forEach(b=>b.onclick=async()=>{
+    const P=(d.outputs.find(o=>o.name===b.dataset.v)||{}).posting||{};
+    const v=P[b.dataset.post]?'':new Date().toLocaleDateString(undefined,{month:'short',day:'numeric'});
+    await post(`/api/p/${cur}/posting`,{video:b.dataset.v,platform:b.dataset.post,value:v});refresh(true)});
+  document.querySelectorAll('[data-note]').forEach(el=>{el.onfocus=()=>editing=true;
+    el.onblur=async()=>{editing=false;await post(`/api/p/${cur}/posting`,{video:el.dataset.note,platform:'note',value:el.value})}});
+  const drop=$('#drop'),pick=$('#pick');
+  $('#browse').onclick=()=>pick.click(); pick.onchange=()=>upload([...pick.files]);
+  drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
+  drop.ondragleave=()=>drop.classList.remove('over');
+  drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');upload([...e.dataTransfer.files])};
+}
+async function upload(files){
+  const drop=$('#drop');
+  for(const f of files){
+    const k=f.type.startsWith('video')?'video':'shot';
+    drop.querySelector('b').textContent=`Uploading ${f.name}…`;
+    await fetch(`/api/p/${cur}/upload?name=${encodeURIComponent(f.name)}&kind=${k}`,{method:'PUT',body:f});
+  }
+  refresh(true);
+}
+let saved=null; try{saved=localStorage.getItem('reelstudio.cur')}catch(e){}
+if(saved) cur=saved;
+loadList().then(()=>cur&&open(cur));
+</script>
+</body>
+</html>

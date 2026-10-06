@@ -1,0 +1,11 @@
+# personal / per-project data stays local
+registry/people.json
+transcripts/
+assets/
+corrections.json
+cues_*.json
+insets_*.json
+*.log
+*.bak.swift
+.DS_Store
+__pycache__/
