@@ -37,7 +37,9 @@ func die(_ m: String) -> Never { FileHandle.standardError.write((m+"\n").data(us
 
 guard let SRC = arg("--in") else { die("need --in IN.mov") }
 let OUT = arg("--out") ?? (SRC as NSString).deletingPathExtension + "_stagereel.mp4"
-let LOGO = arg("--logo") ?? "/Users/adamroberts/Documents/Adam-HQ/Another-Party/brand/another-party-logo.png"
+// logo: --logo, else brand/ next to this script (kept outside ~/Documents so the login agent can read it)
+let LOGO = arg("--logo") ?? URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
+    .appendingPathComponent("brand/another-party-logo.png").path
 let HANDLE = arg("--handle") ?? "@anotherparty25"
 let CTA = arg("--cta")
 let STICKER = arg("--sticker")

@@ -9,3 +9,4 @@ insets_*.json
 *.bak.swift
 .DS_Store
 __pycache__/
+brand/

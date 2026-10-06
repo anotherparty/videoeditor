@@ -24,7 +24,9 @@ let OUT = arg("--out") ?? (SRC as NSString).deletingPathExtension + "_cover.jpg"
 let TITLE = arg("--title") ?? ""
 let ACCENT = arg("--accent")
 let DATE = arg("--date")
-let LOGO = arg("--logo") ?? "/Users/adamroberts/Documents/Adam-HQ/Another-Party/brand/another-party-logo.png"
+// logo: --logo, else brand/ next to this script (kept outside ~/Documents so the login agent can read it)
+let LOGO = arg("--logo") ?? URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
+    .appendingPathComponent("brand/another-party-logo.png").path
 let W: CGFloat = 1080, H: CGFloat = 1920
 let SAFE_TOP: CGFloat = H * 0.125 + 30, SAFE_BOT: CGFloat = H * 0.125 + 30   // 3:4 grid crop + margin
 let mint = NSColor(calibratedRed: 0.20, green: 0.95, blue: 0.78, alpha: 1)

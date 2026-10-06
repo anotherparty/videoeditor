@@ -15,7 +15,7 @@ Make a project, drop in the video (and any screenshots of articles/posts/letters
 caption style, press **Make the videos**. Every planned graphic is listed per video with an on/off switch;
 switching one off re-renders just that video. Download full-quality or phone copies, mark what's posted.
 
-Projects live in `~/Documents/Adam-HQ/Reels/<name>/` (older folders can be listed in `Reels/_index.json`).
+Projects live in `~/Projects/Reels/<name>/` (older folders can be listed in `Reels/_index.json`).
 
 ## Pieces
 

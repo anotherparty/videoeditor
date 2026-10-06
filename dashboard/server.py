@@ -4,7 +4,7 @@ Reel Studio dashboard — local web UI over pipeline.py. No installs (Python std
 
   python3 server.py [--port 8777]      ->  http://localhost:8777
 
-Projects live in ~/Documents/Adam-HQ/Reels/<slug>/ (new ones are made there). Older project folders elsewhere
+Projects live in ~/Projects/Reels/<slug>/ (new ones are made there). Older project folders elsewhere
 are listed in Reels/_index.json (a JSON list of absolute paths). Each project folder = project.json + source files,
 work/, out/, out/phone/, status.json (see ../pipeline.py).
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 SKILL = HERE.parent
-ROOT = Path.home() / "Documents/Adam-HQ/Reels"
+ROOT = Path.home() / "Projects/Reels"
 PIPE = SKILL / "pipeline.py"
 RUNNING = {}            # project path -> Popen
 ROOT.mkdir(parents=True, exist_ok=True)
