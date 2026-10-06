@@ -8,6 +8,9 @@ let asset = AVURLAsset(url: URL(fileURLWithPath: IN))
 guard let vTrack = asset.tracks(withMediaType: .video).first else { die("no video") }
 let aTrack = asset.tracks(withMediaType: .audio).first
 let sz = vTrack.naturalSize
+// optional 4th arg: output width (e.g. 720) to keep small upload copies sharp at low bitrates
+let OW = CommandLine.arguments.count > 4 ? Int(CommandLine.arguments[4])! : Int(sz.width)
+let OH = Int((CGFloat(OW) * sz.height / sz.width / 2).rounded()) * 2
 
 let reader = try! AVAssetReader(asset: asset)
 let vOut = AVAssetReaderTrackOutput(track: vTrack,
@@ -23,7 +26,7 @@ try? FileManager.default.removeItem(atPath: OUT)
 let writer = try! AVAssetWriter(outputURL: URL(fileURLWithPath: OUT), fileType: .mp4)
 let vIn = AVAssetWriterInput(mediaType: .video, outputSettings: [
   AVVideoCodecKey: AVVideoCodecType.h264,
-  AVVideoWidthKey: Int(sz.width), AVVideoHeightKey: Int(sz.height),
+  AVVideoWidthKey: OW, AVVideoHeightKey: OH, AVVideoScalingModeKey: AVVideoScalingModeResizeAspectFill,
   AVVideoCompressionPropertiesKey: [
     AVVideoAverageBitRateKey: BR, AVVideoMaxKeyFrameIntervalKey: 60,
     AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel ]])
