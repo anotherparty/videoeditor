@@ -38,6 +38,7 @@ def main():
     ap.add_argument("--work", required=True); ap.add_argument("--out", required=True)
     ap.add_argument("--plan"); ap.add_argument("--off")
     ap.add_argument("--shots", nargs="*", default=[]); ap.add_argument("--no-stock", action="store_true")
+    ap.add_argument("--avoid", nargs="*", default=[], help="text that must never appear on a screenshot card (e.g. a wrong date)")
     a = ap.parse_args()
     work = Path(a.work); work.mkdir(parents=True, exist_ok=True)
     ranges = [tuple(map(float, p.split("-"))) for p in a.cuts.split(",")]
@@ -102,11 +103,22 @@ def main():
                         if sc: scored.append((sc, f, li))
                 # crop to the passage that holds the most highlight weight, so text stays readable in the top half
                 win = iw / 1.55 / ih                                      # crop height (0-1) matching the split card
-                best, crop = -1, (0.0, min(1.0, win))
+                # lines that must never show (--avoid): the crop may not reach them
+                bad = [l["y0"] for l in boxes if any(a_.lower() in l["text"].lower() for a_ in a.avoid)]
+                # also drop the line just above (its sentence runs into the forbidden one, e.g. "I wrote to Adam in")
+                bad = sorted({max([l["y0"] for l in boxes if l["y0"] < b_] or [b_]) for b_ in bad} | set(bad))
+                def clip(y0, y1):
+                    for b in bad:
+                        if y0 <= b < y1: y1 = b - 0.004                   # stop just above the forbidden line
+                    return y0, y1
+                best, crop = -1, clip(0.0, min(1.0, win))
                 for _, _, li in scored:
                     y0 = max(0.0, min(1.0 - win, boxes[li]["y0"] - 0.02))
-                    w_ = sum(sc for sc, _, lj in scored if boxes[lj]["y0"] >= y0 and boxes[lj]["y1"] <= y0 + win)
-                    if w_ > best: best, crop = w_, (y0, y0 + win)
+                    if any(y0 <= b <= boxes[li]["y0"] for b in bad): continue    # a forbidden line sits above this start
+                    c0, c1 = clip(y0, y0 + win)
+                    if c1 - c0 < 0.04: continue
+                    w_ = sum(sc for sc, _, lj in scored if boxes[lj]["y0"] >= c0 and boxes[lj]["y1"] <= c1)
+                    if w_ > best: best, crop = w_, (c0, c1)
                 seen = set()
                 for sc, f, li in sorted(scored, key=lambda x: -x[0]):
                     if boxes[li]["y0"] >= crop[0] and boxes[li]["y1"] <= crop[1] and f not in seen and len(marks) < 3:

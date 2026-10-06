@@ -40,7 +40,7 @@ let ctx = newCtx(W, H)
 ctx.setFillColor(red: bg.0, green: bg.1, blue: bg.2, alpha: 1); ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
 let maxW = SPLIT ? 1000.0 : 880.0, maxH = SPLIT ? 560.0 : 800.0, ar = r.width / r.height
 var w = maxW, h = w / ar; if h > maxH { h = maxH; w = h * ar }
-let topY = SPLIT ? 320.0 : 330.0   // both sit under the title band (ends ~300px)
+let topY = SPLIT ? 320.0 + max(0, (maxH - h) / 2) : 330.0   // under the title band (ends ~300px); short split crops sit centered
 let place = CGRect(x: (Double(W) - w) / 2, y: Double(H) - topY - h, width: w, height: h)   // CG coords, origin bottom-left
 ctx.interpolationQuality = .high
 ctx.draw(crop, in: place)
