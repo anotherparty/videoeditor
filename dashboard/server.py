@@ -60,7 +60,9 @@ def detail(pid, p):
     if lp.exists():
         lines = [l for l in lp.read_text(errors="ignore").splitlines() if l.startswith("[") or l.startswith("ERROR")]
         log = "\n".join(lines[-14:])
-    return {"id": pid, "path": str(p), "cfg": cfg, "status": st, "running": running(p), "outputs": outs,
+    look = p / "out" / "look.jpg"
+    return {"id": pid, "path": str(p), "cfg": cfg,
+            "look": f"/files/{pid}/out/look.jpg?v={int(look.stat().st_mtime)}" if look.exists() else None, "status": st, "running": running(p), "outputs": outs,
             "suggestions": jload(p / "work" / "suggestions.json", []), "log": log,
             "has_transcript": bool(cfg.get("video")) and (p / "work" / (Path(cfg["video"]).stem + ".json")).exists()}
 
@@ -169,8 +171,9 @@ class H(BaseHTTPRequestHandler):
             look = {"sticker", "date", "cta", "handle", "cap_style", "full_tag"}
             changed = {k for k in data if cfg.get(k) != data[k]}
             cfg.update({k: v for k, v in data.items() if k in look | {"name", "make_full"}}); save()
-            if changed & look:            # the look changed: every video needs a fresh render
+            if changed & look:            # the look changed: every video needs a fresh render, and a new look check
                 for n in ["full"] + [r["name"] for r in cfg.get("reels", [])]: stale(n)
+                cfg["look_ok"] = False; save()
             return self.send(200, {"ok": True})
         if act == "reel":                 # {name, on?, tag?}
             for r in cfg.get("reels", []):
@@ -191,6 +194,9 @@ class H(BaseHTTPRequestHandler):
             if data.get("pick"):
                 for r in cfg.get("reels", []): stale(r["name"])
             return self.send(200, {"started": spawn(p, *args)})
+        if act == "approve":              # "Looks good, make the rest"
+            cfg["look_ok"] = True; save()
+            return self.send(200, {"started": spawn(p)})
         if act == "suggest":
             return self.send(200, {"started": spawn(p, "--suggest")})
         if act == "stop":

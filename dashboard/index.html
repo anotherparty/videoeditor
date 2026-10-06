@@ -91,6 +91,10 @@ video{width:150px;aspect-ratio:9/16;border-radius:10px;background:#1d1a17;object
 .note{width:100%;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12.5px;background:#fff}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
+.look img{width:100%;border-radius:10px;display:block;background:#1d1a17}
+.lookbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.muted{color:var(--muted);font-size:13.5px}
+.pill.preview{background:#ece0fb;color:var(--purple)}
 pre.log{background:#1d1a17;color:#e9e3d8;border-radius:12px;padding:12px 14px;font:12px/1.5 Menlo,monospace;white-space:pre-wrap;max-height:200px;overflow:auto;margin:0}
 .empty{color:var(--muted);text-align:center;padding:60px 20px}
 .err{color:var(--red);font-size:13px}
@@ -138,7 +142,7 @@ async function refresh(full){
 function render(){
   const d=data,c=d.cfg,st=d.status||{};
   const state=d.running?'running':(st.state||'idle');
-  const pill=`<span class="pill ${state.startsWith('done')?'done':state}"><span class="dot"></span>${
+  const pill=`<span class="pill ${state.startsWith('done')?'done':state.startsWith('preview')?'preview':state}"><span class="dot"></span>${
     d.running?`${esc(st.job||'')} ${esc(st.step||'working')}`:state==='done'?'All videos ready':esc(state)}</span>`;
   const shots=(c.shots||[]).map(s=>`<img src="/files/${d.id}/${encodeURI(s)}" title="${esc(s)}">`).join('');
   const sug=(d.suggestions||[]).map(s=>`<button class="chip" data-sug="${esc(s)}">${esc(s)}</button>`).join('');
@@ -146,7 +150,7 @@ function render(){
   <div class="top"><h1>${esc(c.name)}</h1>${pill}<span class="spacer"></span>
     ${d.running?`<button class="btn" id="stop">Stop</button>`:''}
     <button class="btn" id="repick" ${d.running||!c.video?'disabled':''} title="Let the picker choose reels again">Re-pick reels</button>
-    <button class="btn primary" id="go" ${d.running||!c.video?'disabled':''}>${(d.outputs||[]).some(o=>o.url)?'Render changes':'Make the videos'}</button></div>
+    <button class="btn primary" id="go" ${d.running||!c.video?'disabled':''}>${!c.look_ok?'Preview the look':(d.outputs||[]).some(o=>o.url)?'Render changes':'Make the videos'}</button></div>
   ${(st.errors||[]).length?`<p class="err">${st.errors.map(esc).join('<br>')}</p>`:''}
 
   <h2>1 · Footage</h2>
@@ -174,7 +178,16 @@ function render(){
     <p style="font-size:12.5px;color:var(--muted);margin:10px 0 0">Captions always stay off your face. During split-screen they sit on the seam in a white box.</p>
   </div>
 
-  <h2>3 · Videos</h2>
+  <h2>3 · Look check</h2>
+  <div class="card look">${d.look?`
+    <img src="${d.look}" alt="Stills from the preview video, one per kind of graphic">
+    <div class="lookbar">${c.look_ok
+      ?`<span class="pill done"><span class="dot"></span>Look approved</span><span class="muted">Change the title card, captions, or end card and it asks again.</span>`
+      :`<span class="muted">This is ${esc(c.look_preview==='full'?'the full video':'the shortest reel')}, rendered first so you can check the look. Nothing else renders until you say so.</span>
+        <span class="spacer"></span><button class="btn primary" id="approve" ${d.running?'disabled':''}>Looks good, make the rest</button>`}</div>`
+    :`<span class="muted">Press <b>Preview the look</b>. It renders one short video and shows stills of every kind of graphic, so you can check the look before anything else renders.</span>`}</div>
+
+  <h2>4 · Videos</h2>
   <div class="legend">${Object.entries({label:'Name label',place:'Place card',emoji:'Emoji',broll:'Screenshot',stock:'Stock footage'}).map(([k,n])=>
     `<span><i class="k" style="width:9px;height:9px;border-radius:3px;background:${COLORS[k]}"></i>${n}</span>`).join('')}</div>
   <div class="vids" style="margin-top:12px">${(d.outputs||[]).map(vidCard).join('')||'<div class="chipv">Reels show up here after the first render.</div>'}</div>
@@ -218,6 +231,7 @@ function label(i){
 function wire(){
   const d=data;
   $('#go')&&($('#go').onclick=async()=>{await post(`/api/p/${cur}/render`);refresh(true)});
+  $('#approve')&&($('#approve').onclick=async()=>{await post(`/api/p/${cur}/approve`);refresh(true)});
   $('#repick')&&($('#repick').onclick=async()=>{await post(`/api/p/${cur}/render`,{pick:true});refresh(true)});
   $('#stop')&&($('#stop').onclick=async()=>{await post(`/api/p/${cur}/stop`);refresh(true)});
   document.querySelectorAll('[data-k]').forEach(el=>{

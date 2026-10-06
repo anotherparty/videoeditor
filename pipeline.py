@@ -4,6 +4,11 @@ pipeline.py — one project folder in, finished full cut + reels out. The dashbo
 
   python3 pipeline.py PROJECT_DIR [--only NAME] [--force] [--pick]   # render (and auto-pick reels if none)
   python3 pipeline.py PROJECT_DIR --suggest                         # title-card suggestions -> stdout JSON
+  python3 pipeline.py PROJECT_DIR --preview                         # look check: shortest video + out/look.jpg
+
+Look gate (Adam, Oct 6 2026: "I want to see the look before you generate all the things"): until project.json
+has "look_ok": true, a render only makes the preview (the shortest video plus a contact sheet of stills at its
+graphics). The dashboard's "Looks good, make the rest" sets look_ok; changing the look resets it.
 
 PROJECT_DIR/project.json (paths relative to PROJECT_DIR):
   {"name", "video", "shots": [...], "sticker", "date", "cta", "handle", "cap_style": "btb|box|mono",
@@ -67,9 +72,28 @@ class Run:
         reels = json.loads(self.sh(["python3", HERE / "reelpick.py", tj, "--n", "4", "--boost", *self.shot_names()]))
         self.cfg["reels"] = [dict(r, on=True) for r in reels]; self.save_cfg()
 
-    def job(self, tj, name, window, tag, force):
+    def look_sheet(self, name):
+        """contact sheet of the rendered preview: opening frame + the middle of each kind of graphic"""
+        plan = jload(self.work / f"{name}.plan.json", []); edit = jload(self.work / f"{name}.edit.json", {})
+        ts, seen = [1.0], set()
+        for g in edit.get("broll", []) + edit.get("graphics", []):
+            k = g.get("type", "broll") + ("v" if g.get("video") else "") + g.get("layout", "") + ("m" if g.get("marks") else "")
+            if k not in seen: seen.add(k); ts.append(round((g["start"] + g["end"]) / 2, 1))
+        frames = self.work / "look"; frames.mkdir(exist_ok=True)
+        for f in frames.glob("*.jpg"): f.unlink()
+        self.sh(["swift", HERE / "grabframes.swift", self.out / f"{name}.mp4", frames, *[str(t) for t in sorted(ts)[:8]]])
+        self.sh(["swift", HERE / "sheet.swift", self.out / "look.jpg", *sorted(map(str, frames.glob("frame_*.jpg")))])
+
+    def kinds(self, name):
+        """how many different kinds of graphics a video's plan shows (screenshot, stock, label, place, emoji)"""
+        k = set()
+        for x in jload(self.work / f"{name}.plan.json", []):
+            if x.get("on"): k.add("stock" if str(x.get("id", "")).startswith("stock") else x.get("type"))
+        return len(k)
+
+    def job(self, tj, name, window, tag, force, plan_only=False):
         out = self.out / f"{name}.mp4"
-        if out.exists() and not force: self.status["done"].append(name); return
+        if out.exists() and not force and not plan_only: self.status["done"].append(name); return
         style = self.cfg.get("cap_style", "btb")
         mw, mc = (3, 16) if style == "btb" else (6, 30)
         self.say("cutting dead air", name)
@@ -80,6 +104,7 @@ class Run:
         self.sh(["python3", HERE / "autoplan.py", tj, "--cuts", cuts, "--work", self.work / "auto", "--out", self.work / f"{name}.beats.json",
                  "--plan", self.work / f"{name}.plan.json", "--off", self.work / f"{name}.off.json", *(["--shots", *shots] if shots else [])])
         self.sh(["python3", HERE / "editplan.py", tj, "--cuts", cuts, self.work / f"{name}.beats.json", "--out", self.work / f"{name}.edit.json"])
+        if plan_only: return
         self.say("rendering", name)
         c = self.cfg
         self.sh(["swift", HERE / "stagereel.swift", "--in", self.p / c["video"], "--out", out, "--cuts", cuts,
@@ -105,6 +130,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("project"); ap.add_argument("--only"); ap.add_argument("--force", action="store_true")
     ap.add_argument("--pick", action="store_true"); ap.add_argument("--suggest", action="store_true")
+    ap.add_argument("--preview", action="store_true")
     a = ap.parse_args()
     r = Run(Path(a.project).expanduser())
     try:
@@ -115,6 +141,17 @@ def main():
         if a.pick or not r.cfg.get("reels"): r.pick(tj)
         jobs = ([("full", "", r.cfg.get("full_tag", "Full video"))] if r.cfg.get("make_full", True) else []) + \
                [(x["name"], x["window"], x.get("tag", "")) for x in r.cfg.get("reels", []) if x.get("on", True)]
+        if a.preview or not r.cfg.get("look_ok"):
+            # look gate: plan every video (fast), then render only the one that shows the most kinds of
+            # graphics (shortest wins a tie) plus a sheet of stills, and stop for Adam's OK
+            span = lambda j: (lambda w: float(w[1]) - float(w[0]))(j[1].split("-")) if j[1] else 1e9
+            for n_, w_, t_ in jobs:
+                r.say("planning graphics", n_); r.job(tj, n_, w_, t_, True, plan_only=True)
+            name, win, tag = max(jobs, key=lambda j: (r.kinds(j[0]), -span(j)))
+            r.say("rendering the look preview", name)
+            r.job(tj, name, win, tag, True); r.look_sheet(name)
+            r.cfg["look_preview"] = name; r.save_cfg()
+            r.status["state"] = "preview ready"; r.say("waiting for your OK on the look"); return
         for name, win, tag in jobs:
             if a.only and name != a.only: continue
             try: r.job(tj, name, win, tag, a.force or bool(a.only))
