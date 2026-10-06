@@ -76,7 +76,7 @@ let req = VNDetectFaceRectanglesRequest()
 try? VNImageRequestHandler(cgImage: cg, options: [:]).perform([req])
 var head = CGRect(x: W*0.3, y: H*0.15, width: W*0.4, height: H*0.35)
 if let bb = (req.results ?? []).max(by: { $0.boundingBox.width < $1.boundingBox.width })?.boundingBox {
-    let top = (1 - bb.maxY - 0.70 * bb.height) * H, bot = (1 - bb.minY + 0.08 * bb.height) * H
+    let top = (1 - bb.maxY - 0.70 * bb.height) * H, bot = (1 - bb.minY + 0.25 * bb.height) * H   // beard/jaw allowance
     head = CGRect(x: (bb.minX - 0.25 * bb.width) * W, y: top, width: bb.width * 1.5 * W, height: bot - top)
 } else { FileHandle.standardError.write("WARNING: no face found; using a default head zone\n".data(using: .utf8)!) }
 
@@ -111,13 +111,17 @@ func balanced(_ t: String, _ s: CGFloat, _ maxW: CGFloat) -> [String] {
     }
     return best
 }
-// headline block: TITLE lines in white, ACCENT lines mint on purple blocks. Placed below the chin,
-// bottom-aligned to the safe area; shrinks until it fits between chin and safe bottom.
+// headline block: TITLE lines in white, ACCENT lines mint on purple blocks. Goes on whichever side of the
+// head has more room inside the 3:4 safe area: above the head (under the logo) or below the chin.
+// Shrinks until it fits; never overlaps the head.
 let maxW = W * 0.90
 var size: CGFloat = 112
 var tl: [String] = [], al: [String] = []
 var blockH: CGFloat = 0
-let avail = (H - SAFE_BOT) - (head.maxY + 24)
+let logoBottom = SAFE_TOP + W * 0.30 * 0.62 + 24                 // room for the logo (approx aspect)
+let availAbove = head.minY - 30 - logoBottom, availBelow = (H - SAFE_BOT) - (head.maxY + 24)
+let ABOVE = availAbove > availBelow
+let avail = max(availAbove, availBelow)
 while size >= 56 {
     tl = balanced(TITLE, size, maxW); al = ACCENT.map { balanced($0, size, maxW) } ?? []
     blockH = CGFloat(tl.count + al.count) * size * 1.12 + (DATE != nil ? size * 0.55 : 0)
@@ -125,7 +129,8 @@ while size >= 56 {
     size -= 6
 }
 if blockH > avail { FileHandle.standardError.write("WARNING: headline crowds the face; pick a frame where Adam sits higher (--at)\n".data(using: .utf8)!) }
-let blockTop = (H - SAFE_BOT) - blockH            // y from top
+let blockTop = ABOVE ? logoBottom + max(0, (availAbove - blockH) / 2)    // centered in the open wall above the head
+                    : (H - SAFE_BOT) - blockH                            // bottom-aligned below the chin
 
 let logoImg = NSImage(contentsOfFile: LOGO)!
 let logoCG = logoImg.cgImage(forProposedRect: nil, context: nil, hints: nil)!
