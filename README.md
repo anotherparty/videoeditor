@@ -17,6 +17,14 @@ switching one off re-renders just that video. Download full-quality or phone cop
 
 Projects live in `~/Projects/Reels/<name>/` (older folders can be listed in `Reels/_index.json`).
 
+## Presets (the look gets better every project)
+
+`presets/<name>.json` holds a reusable look: caption style, end-card text, link, loudness, and `notes`, a
+list of lessons learned. A new project starts from its preset (`another-party` by default). After you've
+tuned a project's look, press **Save this look to the preset** in section 2 of the dashboard and optionally
+type a lesson. Every project after that starts from the improved version. Title card, date and reel tags
+stay per project. When Claude works on a project, it reads the preset's `notes` first and follows them.
+
 ## Pieces
 
 | file | job |
@@ -33,6 +41,7 @@ Projects live in `~/Projects/Reels/<name>/` (older folders can be listed in `Ree
 | `normalize.swift` | brings speech up to reel loudness (default -15 dBFS) with a peak limiter |
 | `loudness.swift` | prints peak / RMS levels of any video |
 | `ocr.swift`, `grabframes.swift`, `sheet.swift`, `cover.swift`, `compress.swift` | helpers |
+| `presets/` | saved looks + lessons; new projects start from one |
 | `registry/` | people, places, emoji the planner knows (`people.json` is private; see `people.example.json`) |
 
 ## Setup notes

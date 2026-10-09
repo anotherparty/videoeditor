@@ -1,0 +1,14 @@
+{
+ "name": "Another Party",
+ "look": {
+  "cta": "Read the Substack",
+  "handle": "adamrobertswrites.substack.com",
+  "cap_style": "btb",
+  "loudness": -15
+ },
+ "notes": [
+  "2026-10-06: Overlays never cover Adam's head or hair; shrink the logo/box instead.",
+  "2026-10-06: Phone audio is too quiet for Instagram; always normalize speech to -15 dBFS.",
+  "2026-10-06: Show the look preview and get Adam's OK before rendering every video."
+ ]
+}

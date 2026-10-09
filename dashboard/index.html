@@ -176,6 +176,9 @@ function render(){
         `<div class="sty ${c.cap_style===k?'on':''}" data-sty="${k}"><div class="demo">${demo}</div><small>${n}</small></div>`).join('')}
     </div>
     <p style="font-size:12.5px;color:var(--muted);margin:10px 0 0">Captions always stay off your face. During split-screen they sit on the seam in a white box.</p>
+    <div class="lookbar" style="margin-top:14px"><span class="muted">Preset: <b>${esc(c.preset||'another-party')}</b></span>
+      <input class="in" id="lesson" placeholder="Lesson for next time (optional)" style="flex:1">
+      <button class="btn small" id="savepreset" title="New projects start from this caption style, end card, link and loudness">Save this look to the preset</button></div>
   </div>
 
   <h2>3 · Look check</h2>
@@ -231,6 +234,9 @@ function label(i){
 function wire(){
   const d=data;
   $('#go')&&($('#go').onclick=async()=>{await post(`/api/p/${cur}/render`);refresh(true)});
+  $('#lesson')&&($('#lesson').onfocus=()=>editing=true,$('#lesson').onblur=()=>editing=false);
+  $('#savepreset')&&($('#savepreset').onclick=async()=>{const r=await post(`/api/p/${cur}/save_preset`,{note:$('#lesson').value});
+    $('#savepreset').textContent=r.ok?`Saved to ${r.preset}`:'Save failed';$('#lesson').value=''});
   $('#approve')&&($('#approve').onclick=async()=>{await post(`/api/p/${cur}/approve`);refresh(true)});
   $('#repick')&&($('#repick').onclick=async()=>{await post(`/api/p/${cur}/render`,{pick:true});refresh(true)});
   $('#stop')&&($('#stop').onclick=async()=>{await post(`/api/p/${cur}/stop`);refresh(true)});

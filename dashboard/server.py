@@ -16,6 +16,8 @@ HERE = Path(__file__).parent
 SKILL = HERE.parent
 ROOT = Path.home() / "Projects/Reels"
 PIPE = SKILL / "pipeline.py"
+PRESETS = SKILL / "presets"     # presets/<slug>.json = {"name", "look": {...}, "notes": [lessons]}
+PRESET_KEYS = {"cta", "handle", "cap_style", "loudness"}   # per-video things (title card, date, tag) stay per project
 RUNNING = {}            # project path -> Popen
 ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -159,6 +161,8 @@ class H(BaseHTTPRequestHandler):
             cfg = {"name": name, "video": "", "shots": [], "sticker": "", "date": time.strftime("%-m/%-d/%y"),
                    "cta": "Read the Substack", "handle": "adamrobertswrites.substack.com", "cap_style": "btb",
                    "make_full": True, "full_tag": "Full video", "reels": [], "posting": {}}
+            preset = data.get("preset") or "another-party"          # a new project starts from its preset's look
+            cfg.update(jload(PRESETS / f"{preset}.json", {}).get("look", {})); cfg["preset"] = preset
             json.dump(cfg, open(p / "project.json", "w"), indent=1)
             return self.send(200, {"id": re.sub(r"\W+", "-", p.name.lower()).strip("-")})
         if len(parts) < 4 or parts[:2] != ["api", "p"]: return self.send(404, {"error": "not found"})
@@ -175,6 +179,12 @@ class H(BaseHTTPRequestHandler):
                 for n in ["full"] + [r["name"] for r in cfg.get("reels", [])]: stale(n)
                 cfg["look_ok"] = False; save()
             return self.send(200, {"ok": True})
+        if act == "save_preset":          # {note?} -> this project's look (and a lesson) becomes the preset's
+            pp = PRESETS / f"{cfg.get('preset') or 'another-party'}.json"; pre = jload(pp, {"name": pp.stem, "look": {}, "notes": []})
+            pre.setdefault("look", {}).update({k: cfg[k] for k in PRESET_KEYS if k in cfg})
+            if (data.get("note") or "").strip(): pre.setdefault("notes", []).append(time.strftime("%Y-%m-%d: ") + data["note"].strip())
+            json.dump(pre, open(pp, "w"), indent=1, ensure_ascii=False); pp.open("a").write("\n")
+            return self.send(200, {"ok": True, "preset": pp.stem})
         if act == "reel":                 # {name, on?, tag?}
             for r in cfg.get("reels", []):
                 if r["name"] == data.get("name"):
