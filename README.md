@@ -280,3 +280,8 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   re-pressing Share, writes posting[<video>] + post_jobs status (log: work/posting.log). Allowed by Adam's own
   autoMode rule in ~/.claude/settings.json. Tested: dry run (Sal reel), cancel sends nothing, no-caption stops safely.
   A real publish runs the first time Adam presses Post.
+
+## Models (Oct 13 2026)
+Every `claude -p` call names its model. Never Opus (Adam's rule). Sonnet: reel picking (reelpick.py), captions (server ask_claude),
+headline polish + B-roll matching (autoplan.py), article finder (article.py), Chrome posting (posting.py). Haiku: frame
+description + the sign-in check (server.py). Tested: `claude --model haiku|sonnet` both answer; Fable needs paid credits.

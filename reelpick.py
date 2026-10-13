@@ -66,7 +66,7 @@ def claude_pick(words, n, lo, hi):
     ss = sentences(words)
     body = "\n".join(f"{i}. [{s:.1f}-{e:.1f}] {t}" for i, (s, e, t) in enumerate(ss))
     try:
-        r = subprocess.run([str(CLAUDE), "-p", PICK_PROMPT.format(n=n) + "\n" + body, "--output-format", "text"], capture_output=True,
+        r = subprocess.run([str(CLAUDE), "--model", "sonnet", "-p", PICK_PROMPT.format(n=n) + "\n" + body, "--output-format", "text"], capture_output=True,
                            text=True, timeout=180, stdin=subprocess.DEVNULL, cwd=str(Path.home()))
         m = re.search(r"\[.*\]", r.stdout, re.S); got = json.loads(m.group(0)) if m else []
     except Exception: return []

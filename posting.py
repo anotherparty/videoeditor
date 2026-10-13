@@ -67,7 +67,7 @@ def publish(p: Path, n: str, platforms, dry=False):
     if dry: print(prompt); return {"dry_run": True}
     stamp("posting", "Claude is posting in your Chrome (a few minutes)")
     try:
-        r = subprocess.run([str(CLAUDE), "-p", prompt, "--chrome", "--allowedTools", "mcp__claude-in-chrome__*",
+        r = subprocess.run([str(CLAUDE), "--model", "sonnet", "-p", prompt, "--chrome", "--allowedTools", "mcp__claude-in-chrome__*",
                             "--output-format", "text"], capture_output=True, text=True, timeout=1800,
                            stdin=subprocess.DEVNULL, cwd=str(Path.home()))
         m = re.findall(r"\{.*\}", r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "")

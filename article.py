@@ -95,7 +95,7 @@ def find_articles(lines, cache_p: Path):
     if failed.exists() and time.time() - failed.stat().st_mtime < 6 * 3600: print("[article] finder failed lately, skipped (retries 6 h after)"); return []
     body = "\n".join(f"[{s:.1f}] {tx}" for s, tx in lines)[:12000]
     try:
-        r = subprocess.run([str(CLAUDE), "-p", FIND_PROMPT + "\n# What Adam says\n" + body, "--output-format", "text",
+        r = subprocess.run([str(CLAUDE), "--model", "sonnet", "-p", FIND_PROMPT + "\n# What Adam says\n" + body, "--output-format", "text",
                             "--allowedTools", "WebSearch", "WebFetch"], capture_output=True, text=True, timeout=420,
                            stdin=subprocess.DEVNULL, cwd=str(Path.home()))
         m = re.search(r"\{.*\}", r.stdout, re.S)

@@ -428,7 +428,7 @@ def polish(cands, words, work: Path):
         ctx = lambda s: " ".join(w["word"].strip() for w in words if s - 6 <= w["start"] <= s + 12)
         body = "\n".join(f'{n}. Line: "{c[3]}"\n   Context: "{ctx(c[1])}"' for n, c in enumerate(todo, 1))
         try:
-            r = subprocess.run([str(CLAUDE), "-p", POLISH_PROMPT + "\n" + body, "--output-format", "text"], capture_output=True,
+            r = subprocess.run([str(CLAUDE), "--model", "sonnet", "-p", POLISH_PROMPT + "\n" + body, "--output-format", "text"], capture_output=True,
                                text=True, timeout=150, stdin=subprocess.DEVNULL, cwd=str(Path.home()))
             m = re.search(r"\{.*\}", r.stdout, re.S); got = json.loads(m.group(0)) if m else {}
             for n, c in enumerate(todo, 1):
@@ -471,7 +471,7 @@ def broll_auto(files, segs, work: Path, skip=()):
         lines = "\n".join(f"[{s['start']:.1f}] {s['text'].strip()}" for s in segs)
         body = "\n".join(f"{n}. {t} ({'video clip, one frame' if f.suffix.lower() in VIDS else 'photo'})" for n, (f, t) in enumerate(pics, 1))
         try:
-            r = subprocess.run([str(CLAUDE), "-p", f"{BROLL_PROMPT}\nLINES:\n{lines}\n\nPICTURES:\n{body}", "--allowedTools", "Read",
+            r = subprocess.run([str(CLAUDE), "--model", "sonnet", "-p", f"{BROLL_PROMPT}\nLINES:\n{lines}\n\nPICTURES:\n{body}", "--allowedTools", "Read",
                                 "--output-format", "text"], capture_output=True, text=True, timeout=600, stdin=subprocess.DEVNULL, cwd=str(th))
             m = re.search(r"\{.*\}", r.stdout, re.S); got = json.loads(m.group(0)) if m else {}
             for n, (f, t) in enumerate(pics, 1):

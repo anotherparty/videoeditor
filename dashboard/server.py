@@ -105,10 +105,10 @@ def window_text(p, video):
 
 CLAUDE_STATE = Path.home() / ".config" / "another-party" / "claude_state.json"   # last result of calling Claude
 
-def ask_claude(prompt, timeout=180):
+def ask_claude(prompt, timeout=180, model="sonnet"):   # sonnet thinks + writes, haiku does chores; never opus (Adam, Oct 13)
     """claude -p -> (stdout, error); remembers whether Claude was signed in for the health check"""
     if not CLAUDE.exists(): return "", "Claude Code isn't installed"
-    r = subprocess.run([str(CLAUDE), "-p", prompt, "--output-format", "text"], capture_output=True, text=True, timeout=timeout,
+    r = subprocess.run([str(CLAUDE), "--model", model, "-p", prompt, "--output-format", "text"], capture_output=True, text=True, timeout=timeout,
                        stdin=subprocess.DEVNULL, cwd=str(Path.home()))
     out = r.stdout + r.stderr
     state = "needs_login" if "not logged in" in out.lower() or "/login" in out else ("ok" if r.returncode == 0 else "error")
@@ -126,7 +126,7 @@ def on_screen(p, video):
             fr = p / "work" / "scene"; fr.mkdir(exist_ok=True)
             subprocess.run(["swift", str(SKILL / "grabframes.swift"), str(src), str(fr), "10"], capture_output=True, timeout=120)
             if (fr / "frame_0010.jpg").exists():
-                r = subprocess.run([str(CLAUDE), "-p", "Read frame_0010.jpg. In one plain sentence under 25 words, say what is on screen: the setting, "
+                r = subprocess.run([str(CLAUDE), "--model", "haiku", "-p", "Read frame_0010.jpg. In one plain sentence under 25 words, say what is on screen: the setting, "
                                     "what the man talking is doing and holding. No names, no guesses about the place's name. Reply with only the sentence.",
                                     "--allowedTools", "Read", "--output-format", "text"], capture_output=True, text=True, timeout=180,
                                    stdin=subprocess.DEVNULL, cwd=str(fr))
@@ -449,7 +449,7 @@ class H(BaseHTTPRequestHandler):
                 os.replace(f, LIB / new)
             return self.send(200, {"ok": True})
         if parts[:2] == ["api", "claude_test"]:   # tiny call (a few tokens) to check Claude is signed in
-            out, err = ask_claude("Reply with just: ok", timeout=60); return self.send(200, {"ok": not err, "error": err})
+            out, err = ask_claude("Reply with just: ok", timeout=60, model="haiku"); return self.send(200, {"ok": not err, "error": err})
         if parts[:2] == ["api", "cleanup"]:     # delete the kept previous versions of re-rendered videos
             import shutil
             for p in projects().values():
