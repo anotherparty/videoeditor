@@ -97,6 +97,18 @@ def write_caption(p, video):
     try: out = json.loads(m.group(0)) if m else None
     except Exception: out = None
     if not out: return {"error": "Claude didn't return a caption: " + stdout[-300:]}
+    cr = photo_credits(p, video)
+    if cr: out["caption"] = out.get("caption", "").rstrip() + "\n\n" + "\n".join(cr)
+    return out
+
+def photo_credits(p, video):
+    """CC BY / BY-SA photos in this video need a credit + license in the caption too (the on-screen label has it)"""
+    out = []
+    for i in jload(p / "work" / f"{video}.plan.json", []):
+        m = re.match(r"PHOTO: (.+) · CC (BY(?:-SA)?) ([\d.]+)$", i.get("label") or "")
+        if i.get("on") and m:
+            line = f"Photo: {m[1]}, CC {m[2]} {m[3]} (creativecommons.org/licenses/{m[2].lower()}/{m[3]})"
+            if line not in out: out.append(line)
     return out
 
 INSP = ROOT / "_inspiration"      # your look board: files + items.json (local only, never in the public repo)

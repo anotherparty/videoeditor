@@ -93,6 +93,8 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   are now checked as one span. Proven on the Sal reel (Attica 1971 photo at 12-15 s, audio unchanged).
   A place can pin one exact Commons file (`archive_file` in registry/places.json); a pinned CC BY / CC BY-SA photo
   shows its credit on screen ("PHOTO: Jayu · CC BY-SA 2.0"). Attica now uses the 2007 front-gate shot, not the riot photo.
+  Write caption also ends the caption with "Photo: Jayu, CC BY-SA 2.0 (creativecommons.org/licenses/by-sa/2.0)"
+  for every credited photo that's switched on in that video (added by code, not by Claude).
 - ✋ Drop B-roll on the timeline (Oct 12 2026): a Wide video card has a library tray above its timeline. Drag a thumb
   (or a Finder file) onto the timeline: the drop's x position becomes the transcript time (3.8 s long) and is saved as
   hand-placed B-roll (`manual_broll`, same as a transcript-line drop). It shows as a dashed block until the next render.
