@@ -11,6 +11,7 @@ Plans, in priority order (later items never overlap earlier ones):
                         registry person named on the screenshot, else the first "substack/piece/wrote..." word.
   2. name labels       first mention of anyone in registry/people.json          ("Sal · Friend since Attica")
   3. place cards       a registry place with a year nearby                        ("📍 ATTICA 2010")
+  3. your library     ~/Projects/Reels/_library files whose name (or library.json keys) is said -> B-roll
   4. stock B-roll      a registry place/thing with a "stock" query -> Pixabay video (split) or photo (full)
   5. emoji pops        registry/emoji.json words, first use each, spaced out
 Writes beats.json (source-time beats for editplan.py) and plan.json (every candidate, with id/why/on —
@@ -141,7 +142,17 @@ def main():
         add({"id": f"label:{p['name']}", "type": "label", "name": p["name"], "role": p.get("role", ""),
              "why": f"first mention of {p['name']}"}, s, min(s + 3.2, end_of(s)))
 
-    # 3/4. places: year nearby -> place card; else stock query -> B-roll
+    # 3. your own library (~/Projects/Reels/_library) beats Pixabay: a file plays when its name (or library.json keys) is said
+    for lf, keys in library():
+        hit = find_key(keys)
+        if not hit: continue
+        s = words[hit[0]]["start"]; e = min(s + 3.8, end_of(s))
+        item = {"id": f"lib:{lf.name}", "type": "broll", "why": f"'{' '.join(toks[hit[0]:hit[0] + hit[1]])}' -> your library {lf.name}"}
+        if lf.suffix.lower() in VIDS: item.update(video=str(lf))
+        else: item.update(image=str(lf), kb="in")
+        add(item, s, e)
+
+    # 4/5. places: year nearby -> place card; else stock query -> B-roll
     for pl in places:
         hit = find_key(pl["keys"])
         if not hit: continue
@@ -193,6 +204,23 @@ def fetch(url, out=None):
     data = urllib.request.urlopen(req, timeout=30).read()
     if out: open(out, "wb").write(data)
     return data
+
+LIB = Path.home() / "Projects" / "Reels" / "_library"
+VIDS = {".mp4", ".mov", ".m4v"}
+LIB_SKIP = {"img", "photo", "video", "clip", "final", "copy", "edit", "the", "and", "with", "from", "for"}
+
+def library():
+    """[(file, keys)]: keys from library.json {"file.jpg": ["key", ...]} if listed, else the file name's words"""
+    if not LIB.is_dir(): return []
+    side = load(LIB / "library.json", {}); out = []
+    for lf in sorted(LIB.iterdir()):
+        if lf.suffix.lower() not in VIDS | {".jpg", ".jpeg", ".png"}: continue
+        if lf.name in side: keys = side[lf.name]
+        else:
+            ws = [w for w in re.split(r"[\W_]+", lf.stem.lower()) if w and not w.isdigit() and w not in LIB_SKIP]
+            keys = [" ".join(ws)] + [w for w in ws if len(w) >= 4] if ws else []
+        if keys: out.append((lf, keys))
+    return out
 
 def stock(q, cache: Path, need: float):
     """Pixabay: a video clip >= need seconds (preferred), else a photo. Cached by query."""

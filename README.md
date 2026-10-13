@@ -31,6 +31,13 @@ Talking head (btb captions), Panel / interview (box captions, "Watch the full pa
 Planned next: Post panel (caption + hashtag sets per account, YouTube Shorts / Instagram post buttons,
 Substack draft), a CapCut-style drag timeline, and more B-roll options.
 
+**Your B-roll library (Oct 12 2026).** Put your own photos/clips (.jpg .png .mp4 .mov) in
+`~/Projects/Reels/_library/`, named for what they show: `lexi-couch.jpg`, `sing-sing-yard.mov`. When a
+video says the name (or any word of 4+ letters in it), that file plays as B-roll, ahead of Pixabay stock.
+For other trigger words, add `library.json`: `{"lexi-couch.jpg": ["Lexi", "my dog"]}`. Re-run
+Re-pick/Render to pick up new files. Next B-roll steps: Ken Burns + PiP, quote/stat cards, archival
+stills, drag-onto-a-transcript-line.
+
 ## Pieces
 
 | file | job |
