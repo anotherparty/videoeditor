@@ -52,7 +52,7 @@ def build_prompt(p: Path, n: str, platforms) -> str:
     if "—" in caption: raise ValueError("the caption has an em dash; fix it first")
     reel = next((r for r in cfg.get("reels", []) if r["name"] == n), {})
     title = post.get("title") or reel.get("tag") or cfg.get("full_tag") or cfg.get("name", n)
-    cover = p / "out" / f"{n}-cover.jpg"
+    cover = next((c for c in (p / "out" / f"{n}.cover.jpg", p / "out" / f"{n}-cover.jpg") if c.exists()), p / "out" / f"{n}.cover.jpg")
     fill = {"FILE": str(upload_copy(p, n)), "COVER": str(cover) if cover.exists() else "(none, skip the thumbnail)",
             "TITLE": title[:100], "CAPTION": caption, "PLATFORMS": ", ".join(platforms)}
     t = (HERE / "post_prompt.md").read_text()
