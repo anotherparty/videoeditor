@@ -84,6 +84,14 @@ video{width:150px;aspect-ratio:9/16;border-radius:10px;background:#1d1a17;object
 .ph{width:150px;aspect-ratio:9/16;border-radius:10px;background:#ece3d3;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:10px;flex:none}
 .meta{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px;min-width:0}
 .meta a{color:var(--ink);font-weight:600}
+a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center}
+.postp{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:7px}
+.postp textarea{width:100%;min-height:110px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font:14px/1.4 inherit;resize:vertical;box-sizing:border-box}
+.postp input.tags{width:100%;border:1px solid var(--line);border-radius:9px;padding:7px 10px;box-sizing:border-box;font-size:13px}
+.postp .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.postp .cov{width:84px;border-radius:8px;border:1px solid var(--line)}
+.postp .flag{font-size:12.5px;background:#fff1ea;color:var(--red);border-radius:7px;padding:5px 8px}
+.postp .alt{font-size:12.5px;color:var(--muted)}
 .tlwrap{overflow-x:auto;border-radius:7px}
 .timeline{position:relative;min-width:100%;background:#f1e9db;border-radius:7px;overflow:hidden;touch-action:none;user-select:none;
   background-image:repeating-linear-gradient(90deg,transparent 0 calc(var(--px5) - 1px),#e2d6c2 calc(var(--px5) - 1px) var(--px5))}
@@ -256,8 +264,29 @@ function vidCard(o){
     ${plan.length?`<div class="tlwrap"><div class="timeline" data-v="${o.name}" data-start="${start}" data-span="${span}" style="width:${tlW}px;height:${tlH}px;--px5:${PX*5}px">${tl}</div></div>
       <div class="tlbar"><span>${fmt(0)}</span><span>Drag a block to move it · drag its edge to stretch it${plan.some(i=>i.moved)?` · <a data-reset="${o.name}">Reset moves</a>`:''}</span><span>${fmt(span)}</span></div>
       <div class="plan">${items}</div>`:''}
+    ${o.url?postPanel(o):''}
     <div><label class="f">Posted</label><div class="post">${plat}</div>
       <input class="note" style="margin-top:6px" placeholder="Waiting on… (e.g. Craig's OK)" data-note="${o.name}" value="${esc(P.note||'')}"></div>
+  </div>`;
+}
+function postPanel(o){
+  const q=o.post||{}, n=o.name, tags=q.tags!=null?q.tags:((ACC['@anotherparty25']||{}).hashtags||'');
+  return `<div class="postp"><label class="f" style="margin:0">Post to @anotherparty25</label>
+    <div class="row"><button class="btn small dark" data-cap="${n}">${q.caption?'Rewrite caption':'✍️ Write caption'}</button>
+      <span class="muted" id="capst-${n}" style="font-size:12px">${q.caption?'':'Claude writes it from what you say, in your voice'}</span></div>
+    ${q.caption!=null?`<textarea data-pf="caption" data-pv="${n}">${esc(q.caption)}</textarea>
+      ${q.alt_hook?`<div class="alt">Other first line: <i>${esc(q.alt_hook)}</i></div>`:''}`:''}
+    <input class="tags" data-pf="tags" data-pv="${n}" value="${esc(tags)}" placeholder="#hashtags">
+    ${(q.flags||[]).filter(Boolean).map(f=>`<div class="flag">⚠️ ${esc(f)}</div>`).join('')}
+    ${q.alt_text?`<div class="alt">Alt text: ${esc(q.alt_text)}</div>`:''}
+    <div class="row">${o.cover?`<a href="${o.cover}" target="_blank"><img class="cov" src="${o.cover}" alt="Cover"></a>`:''}
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <button class="btn small" data-cover="${n}" data-step="${o.cover?5:0}">${o.cover?'Another frame':'🖼 Make cover'}</button>
+        ${o.cover?`<a class="btn small" href="${o.cover.split('?')[0]}?dl=1">Download cover</a>`:''}</div></div>
+    <div class="row"><button class="btn small primary" data-copy="${n}">📋 Copy caption + hashtags</button>
+      <a class="btn small" href="${o.url}?dl=1">⬇ Video</a>
+      <a class="btn small" href="https://www.instagram.com/" target="_blank" rel="noopener">Open Instagram ↗</a>
+      <button class="btn small" data-savetags title="New videos start with these hashtags">Save hashtags as default</button></div>
   </div>`;
 }
 function label(i){
@@ -295,7 +324,7 @@ function wire(){
     await post(`/api/p/${cur}/posting`,{video:b.dataset.v,platform:b.dataset.post,value:v});refresh(true)});
   document.querySelectorAll('[data-note]').forEach(el=>{el.onfocus=()=>editing=true;
     el.onblur=async()=>{editing=false;await post(`/api/p/${cur}/posting`,{video:el.dataset.note,platform:'note',value:el.value})}});
-  byHand(data.cfg); timelines();
+  byHand(data.cfg); timelines(); posts();
   const drop=$('#drop'),pick=$('#pick');
   $('#browse').onclick=()=>pick.click(); pick.onchange=()=>upload([...pick.files]);
   drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
@@ -303,6 +332,26 @@ function wire(){
   drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');upload([...e.dataTransfer.files])};
 }
 // timeline: drag a block to move it, drag an edge to stretch it; saved per video as source-time spans
+let ACC={}; api('/api/accounts').then(a=>ACC=a||{});
+function posts(){
+  document.querySelectorAll('[data-cap]').forEach(b=>b.onclick=async()=>{const n=b.dataset.cap;b.disabled=true;
+    const s=$('#capst-'+n); s.textContent='Claude is writing… (about 20 seconds)';
+    const r=await post(`/api/p/${cur}/caption`,{video:n}); if(r.error){s.textContent=r.error;b.disabled=false}else refresh(true)});
+  document.querySelectorAll('[data-pf]').forEach(el=>{el.onfocus=()=>editing=true;
+    el.onblur=async()=>{editing=false;await post(`/api/p/${cur}/post_save`,{video:el.dataset.pv,[el.dataset.pf]:el.value})}});
+  document.querySelectorAll('[data-cover]').forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent='Making cover…';
+    const r=await post(`/api/p/${cur}/cover`,{video:b.dataset.cover,step:+b.dataset.step});if(r.error)alert(r.error);refresh(true)});
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{const box=b.closest('.postp');
+    const cap=(box.querySelector('[data-pf=caption]')||{}).value||'', tags=box.querySelector('[data-pf=tags]').value;
+    const txt=(cap+'\n\n'+tags).trim(); let ok=false;
+    try{ok=(await post('/api/clip',{text:txt})).ok}catch(e){}
+    if(!ok){try{await navigator.clipboard.writeText(txt);ok=true}catch(e){}}
+    b.textContent=ok?'✓ Copied':'Copy failed';
+    setTimeout(()=>b.textContent='📋 Copy caption + hashtags',1800)});
+  document.querySelectorAll('[data-savetags]').forEach(b=>b.onclick=async()=>{const v=b.closest('.postp').querySelector('[data-pf=tags]').value;
+    await fetch('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:'@anotherparty25',hashtags:v})});
+    ACC['@anotherparty25']={hashtags:v};b.textContent='✓ Saved'});
+}
 const WIDE=new Set();
 function timelines(){
   document.querySelectorAll('[data-wide]').forEach(b=>b.onclick=()=>{const n=b.dataset.wide;WIDE.has(n)?WIDE.delete(n):WIDE.add(n);render()});

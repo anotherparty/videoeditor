@@ -41,6 +41,29 @@ def spawn(p, *args):
 LIB = Path.home() / "Projects" / "Reels" / "_library"
 VIDS, IMGS = {".mp4", ".mov", ".m4v"}, {".jpg", ".jpeg", ".png"}
 
+CLAUDE = Path.home() / ".local" / "bin" / "claude"                       # Claude Code CLI (uses Adam's subscription)
+CAPTION_PROMPT = Path.home() / ".config" / "another-party" / "caption_prompt.md"   # private: his voice + ig-caption rules
+ACCOUNTS = SKILL / "registry" / "accounts.json"   # {"@anotherparty25": {"hashtags": "#a #b"}}
+DEFAULT_ACCOUNTS = {"@anotherparty25": {"hashtags": "#formerlyincarcerated #reentry #prisonreform #massincarceration #secondchances"}}
+
+def window_text(p, video):
+    """what Adam says in this video (the reel's window, or everything for the full video)"""
+    cfg = jload(p / "project.json", {}); w = next((r.get("window", "") for r in cfg.get("reels", []) if r["name"] == video), "")
+    lo, hi = (map(float, w.split("-")) if w else (0, 1e9))
+    return " ".join(r["text"] for r in lines(p) if r["end"] >= lo and r["start"] <= hi), lo, hi
+
+def write_caption(p, video):
+    """Claude writes the caption from the transcript (claude -p, 3 min max) -> cfg["post"][video]"""
+    text, _, _ = window_text(p, video)
+    if not CLAUDE.exists(): return {"error": "Claude Code isn't installed yet"}
+    prompt = CAPTION_PROMPT.read_text() + "\n\n# Reel transcript\n" + text[:6000]
+    r = subprocess.run([str(CLAUDE), "-p", prompt, "--output-format", "text"], capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
+    m = re.search(r"\{.*\}", r.stdout, re.S)
+    try: out = json.loads(m.group(0)) if m else None
+    except Exception: out = None
+    if not out: return {"error": "Claude didn't return a caption: " + (r.stderr or r.stdout)[-300:]}
+    return out
+
 def lines(p):
     """the transcript as short lines [{start, end, text}] — a new line at a sentence/clause end (5+ words), 14 words, or a pause"""
     cfg = jload(p / "project.json", {})
@@ -72,7 +95,8 @@ def detail(pid, p):
                      "phone_mb": round(ph.stat().st_size / 1e6, 1) if ph.exists() else 0,
                      "mtime": f.stat().st_mtime if f.exists() else 0,
                      "plan": jload(p / "work" / f"{n}.plan.json", []),
-                     "posting": cfg.get("posting", {}).get(n, {})})
+                     "posting": cfg.get("posting", {}).get(n, {}), "post": cfg.get("post", {}).get(n, {}),
+                     "cover": f"/files/{pid}/out/{n}.cover.jpg?v={int((p / 'out' / f'{n}.cover.jpg').stat().st_mtime)}" if (p / "out" / f"{n}.cover.jpg").exists() else None})
     log = ""
     lp = p / "work" / "pipeline.log"
     if lp.exists():
@@ -111,6 +135,8 @@ class H(BaseHTTPRequestHandler):
                             "videos": len(list((p / "out").glob("*.mp4"))) if (p / "out").exists() else 0,
                             "mtime": (p / "project.json").stat().st_mtime})
             return self.send(200, sorted(out, key=lambda x: -x["mtime"]))
+        if parts[:2] == ["api", "accounts"]:
+            return self.send(200, jload(ACCOUNTS, DEFAULT_ACCOUNTS))
         if parts[:2] == ["api", "library"]:    # your B-roll library, for the drag tray
             return self.send(200, [{"name": f.name, "path": str(f), "video": f.suffix.lower() in VIDS}
                                    for f in sorted(LIB.iterdir()) if f.suffix.lower() in VIDS | IMGS] if LIB.is_dir() else [])
@@ -195,6 +221,11 @@ class H(BaseHTTPRequestHandler):
             cfg.update(jload(PRESETS / f"{preset}.json", {}).get("look", {})); cfg["preset"] = preset
             json.dump(cfg, open(p / "project.json", "w"), indent=1)
             return self.send(200, {"id": re.sub(r"\W+", "-", p.name.lower()).strip("-")})
+        if parts[:2] == ["api", "clip"]:        # {text} -> the Mac clipboard (browsers often block page clipboard writes)
+            subprocess.run(["pbcopy"], input=data.get("text", ""), text=True); return self.send(200, {"ok": True})
+        if parts[:2] == ["api", "accounts"]:    # {account, hashtags} -> saved hashtag set
+            acc = jload(ACCOUNTS, DEFAULT_ACCOUNTS); acc.setdefault(data["account"], {})["hashtags"] = data.get("hashtags", "")
+            json.dump(acc, open(ACCOUNTS, "w"), indent=1, ensure_ascii=False); return self.send(200, {"ok": True})
         if len(parts) < 4 or parts[:2] != ["api", "p"]: return self.send(404, {"error": "not found"})
         p = projects().get(parts[2]); act = parts[3]
         if not p: return self.send(404, {"error": "no project"})
@@ -225,6 +256,27 @@ class H(BaseHTTPRequestHandler):
                     w = next((r.get("window", "") for r in cfg.get("reels", []) if r["name"] == n), "")
                     if not w or float(w.split("-")[0]) <= t0 <= float(w.split("-")[1]): stale(n)
             return self.send(200, {"ok": True})
+        if act == "caption":              # {video} -> Claude writes caption + hashtags + alt text in Adam's voice
+            out = write_caption(p, data["video"])
+            if "error" in out: return self.send(200, out)
+            cfg = jload(cfgp, {}); post = cfg.setdefault("post", {}).setdefault(data["video"], {})
+            post.update(caption=out.get("caption", ""), alt_hook=out.get("alt_hook", ""), alt_text=out.get("alt_text", ""),
+                        flags=out.get("flags", []), tags=" ".join(out.get("hashtags", [])))
+            json.dump(cfg, open(cfgp, "w"), indent=1, ensure_ascii=False); return self.send(200, {"ok": True})
+        if act == "post_save":            # {video, caption?, tags?, alt_text?} -> your edits
+            post = cfg.setdefault("post", {}).setdefault(data["video"], {})
+            post.update({k: data[k] for k in ("caption", "tags", "alt_text") if k in data}); save(); return self.send(200, {"ok": True})
+        if act == "cover":                # {video, step?} -> cover.jpg from the source video, logo + title in the 3:4 safe area
+            _, lo, hi = window_text(p, data["video"]); post = cfg.setdefault("post", {}).setdefault(data["video"], {})
+            at = post.get("cover_at", lo + 3) + float(data.get("step", 0))
+            vlen = max((r["end"] for r in lines(p)), default=lo + 10)
+            if at > min(hi, vlen) - 1: at = lo + 1            # past the end: wrap around
+            out = p / "out" / f"{data['video']}.cover.jpg"
+            r = subprocess.run(["swift", str(SKILL / "cover.swift"), "--in", str(p / cfg["video"]), "--at", f"{at:.2f}",
+                                "--title", cfg.get("sticker") or cfg.get("name", ""), "--date", cfg.get("date", ""), "--out", str(out)],
+                               capture_output=True, text=True, timeout=120)
+            if not out.exists(): return self.send(200, {"error": "cover failed: " + r.stderr[-300:]})
+            post["cover_at"] = round(at, 2); save(); return self.send(200, {"ok": True})
         if act == "reel":                 # {name, on?, tag?}
             for r in cfg.get("reels", []):
                 if r["name"] == data.get("name"):
