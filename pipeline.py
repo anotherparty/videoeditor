@@ -121,7 +121,8 @@ class Run:
         self.say("cutting dead air", name)
         cuts = self.sh(["python3", HERE / "deadair.py", tj, *edit_args(self.edit()), "--pad", "0.15", *(["--within", window] if window else [])]).strip()
         (self.work / f"{name}.cuts.txt").write_text(cuts)      # the dashboard maps video time <-> transcript time with this
-        self.sh(["python3", HERE / "makecaptions.py", tj, "--cuts", cuts, "--max-words", mw, "--max-chars", mc, "--out", self.work / f"{name}.cues.json"])
+        fixes = self.work / "word_fixes.json"; jsave(fixes, self.cfg.get("word_fixes", []))   # misheard words Adam corrected
+        self.sh(["python3", HERE / "makecaptions.py", tj, "--cuts", cuts, "--max-words", mw, "--max-chars", mc, "--fixes", fixes, "--out", self.work / f"{name}.cues.json"])
         self.say("planning graphics", name)
         shots = [str(self.p / s) for s in self.cfg.get("shots", [])]
         manual = self.work / "manual_broll.json"      # B-roll dragged onto transcript lines in the dashboard
