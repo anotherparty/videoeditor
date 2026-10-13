@@ -91,6 +91,9 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   ("ARCHIVE PHOTO", Ken Burns, you in a corner bubble) for 3.5 s right after its place card, or instead of stock.
   Fix: the photo was always dropped because the 0.4 s gap rule counted its own place card as an overlap; card + photo
   are now checked as one span. Proven on the Sal reel (Attica 1971 photo at 12-15 s, audio unchanged).
+- ✋ Drop B-roll on the timeline (Oct 12 2026): a Wide video card has a library tray above its timeline. Drag a thumb
+  (or a Finder file) onto the timeline: the drop's x position becomes the transcript time (3.8 s long) and is saved as
+  hand-placed B-roll (`manual_broll`, same as a transcript-line drop). It shows as a dashed block until the next render.
 
 ## Pieces
 

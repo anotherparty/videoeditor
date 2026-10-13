@@ -101,6 +101,9 @@ a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center}
 .tl.drag{cursor:grabbing;opacity:1;z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .tl .h{position:absolute;top:0;bottom:0;width:7px;cursor:ew-resize;background:rgba(255,255,255,.35)}
 .tl .h.l{left:0}.tl .h.r{right:0}
+.tl.pending{opacity:.6;background-image:repeating-linear-gradient(45deg,transparent 0 6px,rgba(255,255,255,.35) 6px 12px)!important;outline:1px dashed #0006}
+.timeline.over{outline:2px dashed var(--red);outline-offset:-2px}
+.tltray{margin-bottom:6px}
 .tlbar{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:3px 2px 6px}
 .tlbar a{color:var(--red);cursor:pointer}
 .tltip{position:fixed;pointer-events:none;background:#222;color:#fff;font-size:12px;padding:3px 7px;border-radius:6px;z-index:9;display:none}
@@ -198,7 +201,7 @@ const api=(p,o={})=>fetch(p,{headers:{'Content-Type':'application/json'},...o}).
 const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b||{})});
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const kind=it=>{const p=String(it.id||'').split(':')[0];
-  return {stock:'stock',lib:'lib',hand:'hand',quote:'card',stat:'card',news:'news'}[p]||(it.type==='broll'?'broll':it.type)};
+  return {stock:'stock',lib:'lib',hand:'hand',pending:'hand',quote:'card',stat:'card',news:'news'}[p]||(it.type==='broll'?'broll':it.type)};
 const fmt=t=>{t=Math.max(0,t);return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0')};
 
 async function loadList(){
@@ -311,15 +314,21 @@ const ranges=c=>(c||'').split(',').filter(Boolean).map(r=>r.split('-').map(Numbe
 function src2out(s,c){let o=0;for(const [a,b] of ranges(c)){if(s<a)return o;if(s<=b)return o+s-a;o+=b-a}return o}
 function out2src(t,c){let o=0;for(const [a,b] of ranges(c)){if(t<=o+(b-a))return a+(t-o);o+=b-a}return null}
 function vidCard(o){
-  const plan=o.plan||[], end=Math.max(1,...plan.map(i=>i.src[1]),
+  const w0=o.window?o.window.split('-').map(Number):null;
+  // B-roll you dropped that this video's plan doesn't have yet: a dashed "pending" block until the next render
+  const pend=(data.cfg.manual_broll||[]).filter(m=>(!w0||(m.start>=w0[0]&&m.start<=w0[1]))&&
+      !(o.plan||[]).some(i=>String(i.id).startsWith('hand:')&&Math.abs(i.src[0]-m.start)<0.05))
+    .map(m=>({id:'pending:'+m.path, type:'broll', image:m.path, src:[m.start,m.end], on:true, pending:true,
+      why:`you dropped ${m.path.split('/').pop()} here; it shows up after the next render`}));
+  const plan=[...(o.plan||[]),...pend], end=Math.max(1,...plan.map(i=>i.src[1]),
     o.window?parseFloat(o.window.split('-')[1]):1), start=o.window?parseFloat(o.window.split('-')[0]):0;
   const span=Math.max(1,end-start);
   const lanes=[], lane=[];     // overlapping blocks go on separate rows so every block can be grabbed
   [...plan.keys()].sort((x,y)=>plan[x].src[0]-plan[y].src[0]).forEach(n=>{const i=plan[n];
     let k=lanes.findIndex(e=>e<=i.src[0]);if(k<0){k=lanes.length;lanes.push(0)}lanes[k]=i.src[1];lane[n]=k});
   const PX=28, tlW=Math.round(span*PX), tlH=Math.max(1,lanes.length)*32+6;
-  const tl=plan.map((i,n)=>`<div class="tl ${i.on?'':'off'} ${i.moved?'moved':''}" data-id="${esc(i.id)}" data-s="${i.src[0]}" data-e="${i.src[1]}" title="${esc(i.why)}" style="top:${4+lane[n]*32}px;left:${(i.src[0]-start)/span*100}%;width:${(i.src[1]-i.src[0])/span*100}%;background:${COLORS[kind(i)]}"><i class="h l"></i>${esc(label(i))}<i class="h r"></i></div>`).join('');
-  const items=plan.map(i=>`<div class="it ${i.on?'':'off'}"><i class="k" style="background:${COLORS[kind(i)]}"></i>
+  const tl=plan.map((i,n)=>`<div class="tl ${i.on?'':'off'} ${i.moved?'moved':''} ${i.pending?'pending':''}" data-id="${esc(i.id)}" data-s="${i.src[0]}" data-e="${i.src[1]}" title="${esc(i.why)}" style="top:${4+lane[n]*32}px;left:${(i.src[0]-start)/span*100}%;width:${(i.src[1]-i.src[0])/span*100}%;background:${COLORS[kind(i)]}"><i class="h l"></i>${esc(label(i))}<i class="h r"></i></div>`).join('');
+  const items=plan.filter(i=>!i.pending).map(i=>`<div class="it ${i.on?'':'off'}"><i class="k" style="background:${COLORS[kind(i)]}"></i>
     <span class="t">${fmt(i.src[0]-start)}</span><span class="w" title="${esc(i.why)}">${esc(label(i))}</span>
     <label class="sw"><input type="checkbox" data-tog="${esc(i.id)}" data-v="${o.name}" ${i.on?'checked':''}><span></span></label></div>`).join('');
   const P=o.posting||{};
@@ -334,8 +343,9 @@ function vidCard(o){
         ${o.url?`<a href="${o.url}?dl=1">Download full quality</a><span>${o.mb} MB · for Instagram upload</span>`:''}
         ${o.phone?`<a href="${o.phone}?dl=1">Download phone copy</a><span>${o.phone_mb} MB · for texting / review</span>`:''}
         <span>${plan.filter(i=>i.on).length} graphics planned</span></div></div>
+    ${plan.length&&isWide(o)?`<div class="tray tltray" title="Drag a photo or clip onto the timeline below (or drop a file from Finder)"></div>`:''}
     ${plan.length?`<div class="tlwrap"><div class="timeline" data-v="${o.name}" data-start="${start}" data-span="${span}" data-cuts="${esc(o.cuts||'')}" style="width:${tlW}px;height:${tlH}px;--px5:${PX*5}px">${tl}<i class="phl"></i></div></div>
-      <div class="tlbar"><span>${fmt(0)}</span><span>Drag a block to move it · drag its edge to stretch it${plan.some(i=>i.moved)?` · <a data-reset="${o.name}">Reset moves</a>`:''}</span><span>${fmt(span)}</span></div>
+      <div class="tlbar"><span>${fmt(0)}</span><span>Drag a block to move it · drag its edge to stretch it${isWide(o)?' · drop B-roll onto it':''}${plan.some(i=>i.moved)?` · <a data-reset="${o.name}">Reset moves</a>`:''}</span><span>${fmt(span)}</span></div>
       <div class="plan">${items}</div>`:''}
     ${o.url?postPanel(o):''}
     <div><label class="f">Posted</label><div class="post">${plat}</div>
@@ -447,7 +457,7 @@ function timelines(){
   let tip=$('#tltip'); if(!tip){tip=document.createElement('div');tip.id='tltip';tip.className='tltip';document.body.appendChild(tip)}
   document.querySelectorAll('.timeline[data-v]').forEach(tlEl=>{
     const v=tlEl.dataset.v, start=+tlEl.dataset.start, span=+tlEl.dataset.span;
-    tlEl.querySelectorAll('.tl').forEach(b=>b.onpointerdown=e=>{
+    tlEl.querySelectorAll('.tl:not(.pending)').forEach(b=>b.onpointerdown=e=>{
       e.preventDefault(); editing=true; b.setPointerCapture(e.pointerId); b.classList.add('drag');
       const mode=e.target.classList.contains('l')?'l':e.target.classList.contains('r')?'r':'m';
       const s0=+b.dataset.s, e0=+b.dataset.e, x0=e.clientX, W=tlEl.getBoundingClientRect().width;
@@ -475,24 +485,48 @@ function timelines(){
       const x=(s-start)/span*tlEl.offsetWidth; if(!vid.paused&&(x<wrap.scrollLeft||x>wrap.scrollLeft+wrap.clientWidth-20)) wrap.scrollLeft=x-40};
     vid.onplay=()=>{LASTVID=vid};
   });
+  (LIB?Promise.resolve(LIB):api('/api/library')).then(l=>{LIB=l||[];
+    document.querySelectorAll('.tltray').forEach(tr=>{tr.innerHTML=trayHTML();
+      tr.querySelectorAll('.th').forEach(th=>{th.ondragstart=e=>{editing=true;e.dataTransfer.setData('text/rs-path',th.dataset.path)};
+        th.ondragend=()=>{editing=false}})})});
+  document.querySelectorAll('.timeline[data-v]').forEach(tlEl=>{
+    const start=+tlEl.dataset.start, span=+tlEl.dataset.span;
+    const at=e=>{const r=tlEl.getBoundingClientRect(), s=start+Math.min(Math.max(0,(e.clientX-r.left)/r.width),1)*span;
+      return {start:Math.round(s*10)/10, end:Math.round(Math.min(s+3.8,start+span)*10)/10}};
+    tlEl.ondragenter=()=>editing=true;
+    tlEl.ondragover=e=>{e.preventDefault();tlEl.classList.add('over');const a=at(e);
+      tip.style.display='block';tip.style.left=e.clientX+12+'px';tip.style.top=e.clientY-30+'px';tip.textContent=`B-roll at ${fmt(a.start-start)}`};
+    tlEl.ondragleave=()=>{tlEl.classList.remove('over');tip.style.display='none'};
+    tlEl.ondrop=async e=>{e.preventDefault();tlEl.classList.remove('over');tip.style.display='none';
+      await dropBroll(e,at(e),m=>tip.textContent=m)};
+  });
   document.querySelectorAll('[data-reset]').forEach(a=>a.onclick=async()=>{await post(`/api/p/${cur}/move_reset`,{video:a.dataset.reset});refresh(true)});
 }
 let LINES={id:null,rows:[]}, LIB=null, linesTop=0;
+const trayHTML=()=>LIB&&LIB.length?LIB.map(f=>`<div class="th" draggable="true" data-path="${esc(f.path)}" title="${esc(f.name)}"
+      style="${f.video?'':`background-image:url('/lib/${encodeURIComponent(f.name)}')`}"><span>${f.video?'🎬 ':''}${esc(f.name)}</span></div>`).join('')
+    :'<span class="muted" style="font-size:13px">Your library is empty. Put photos/clips in Projects/Reels/_library, or drag files from Finder.</span>';
+// a B-roll drop (library thumb or Finder file) -> hand-placed B-roll at that transcript time
+async function dropBroll(e,at,busy){
+  let path=e.dataTransfer.getData('text/rs-path');
+  if(!path&&e.dataTransfer.files.length){const f=e.dataTransfer.files[0]; if(busy)busy(`Uploading ${f.name}…`);
+    const r=await fetch(`/api/p/${cur}/upload?name=${encodeURIComponent(f.name)}&kind=broll`,{method:'PUT',body:f}).then(r=>r.json());path=r.path}
+  editing=false;
+  if(path){await post(`/api/p/${cur}/broll_add`,{path,...at});refresh(true)}
+}
 const mmss=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 async function byHand(c){
   if(!c.video||!$('#lines'))return;
   if(LINES.id!==cur){const r=await api(`/api/p/${cur}/lines`);LINES={id:cur,rows:Array.isArray(r)?r:[]}}
   if(!LIB) LIB=await api('/api/library');
-  $('#tray').innerHTML=LIB.length?LIB.map(f=>`<div class="th" draggable="true" data-path="${esc(f.path)}" title="${esc(f.name)}"
-      style="${f.video?'':`background-image:url('/lib/${encodeURIComponent(f.name)}')`}"><span>${f.video?'🎬 ':''}${esc(f.name)}</span></div>`).join('')
-    :'<span class="muted" style="font-size:13px">Your library is empty. Put photos/clips in Projects/Reels/_library, or drag files from Finder.</span>';
+  $('#tray').innerHTML=trayHTML();
   const mb=c.manual_broll||[];
   const el=$('#lines');
   el.innerHTML=LINES.rows.length?LINES.rows.map(r=>`<div class="ln" data-s="${r.start}" data-e="${r.end}"><span class="tm">${mmss(r.start)}</span><span class="tx">${esc(r.text)}</span>
       ${mb.map((m,i)=>m.start>=r.start&&m.start<=r.end?`<span class="hb">${esc(m.path.split('/').pop())}<b data-del="${i}" title="Remove">✕</b></span>`:'').join('')}</div>`).join('')
     :'<span class="muted">The transcript shows up once the video has been listened to.</span>';
   el.scrollTop=linesTop; el.onscroll=()=>linesTop=el.scrollTop;
-  document.querySelectorAll('#tray .th').forEach(th=>{
+  document.querySelectorAll('.tray .th').forEach(th=>{
     th.ondragstart=e=>{editing=true;e.dataTransfer.setData('text/rs-path',th.dataset.path)};
     th.ondragend=()=>{editing=false}});
   el.querySelectorAll('.ln').forEach(ln=>{
@@ -500,13 +534,7 @@ async function byHand(c){
     ln.ondragover=e=>{e.preventDefault();ln.classList.add('over')};
     ln.ondragleave=()=>ln.classList.remove('over');
     ln.ondrop=async e=>{e.preventDefault();e.stopPropagation();ln.classList.remove('over');
-      const at={start:+ln.dataset.s,end:+ln.dataset.e};
-      let path=e.dataTransfer.getData('text/rs-path');
-      if(!path&&e.dataTransfer.files.length){const f=e.dataTransfer.files[0];
-        ln.querySelector('.tx').textContent=`Uploading ${f.name}…`;
-        const r=await fetch(`/api/p/${cur}/upload?name=${encodeURIComponent(f.name)}&kind=broll`,{method:'PUT',body:f}).then(r=>r.json());path=r.path}
-      editing=false;
-      if(path){await post(`/api/p/${cur}/broll_add`,{path,...at});refresh(true)}}});
+      await dropBroll(e,{start:+ln.dataset.s,end:+ln.dataset.e},m=>ln.querySelector('.tx').textContent=m)}});
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{await post(`/api/p/${cur}/broll_del`,{i:+b.dataset.del});refresh(true)});
 }
 async function upload(files){
