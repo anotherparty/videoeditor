@@ -185,3 +185,9 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
 - Transcription uses a Python venv with `faster-whisper` (path set in `pipeline.py`, `VENV_PY`).
 - Stock footage uses a Pixabay API key read from `~/.config/another-party/pixabay_key` (never commit it).
 - The logo path is a `--logo` flag on `stagereel.swift`; the default points at the Another Party brand file.
+- 🚀 Post button (Oct 13 2026): Post panel button posts one video to YouTube (Another Party) and/or Instagram
+  (@anotherparty25) after a confirm box. posting.py runs as its own process: under-10MB upload copy, post_prompt.md,
+  claude -p --chrome drives Adam's signed-in Chrome (YouTube Studio, then Meta Business Suite), checks before ever
+  re-pressing Share, writes posting[<video>] + post_jobs status (log: work/posting.log). Allowed by Adam's own
+  autoMode rule in ~/.claude/settings.json. Tested: dry run (Sal reel), cancel sends nothing, no-caption stops safely.
+  A real publish runs the first time Adam presses Post.

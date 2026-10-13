@@ -466,6 +466,15 @@ class H(BaseHTTPRequestHandler):
                     w = next((r.get("window", "") for r in cfg.get("reels", []) if r["name"] == n), "")
                     if not w or float(w.split("-")[0]) <= t0 <= float(w.split("-")[1]): stale(n)
             return self.send(200, {"ok": True})
+        if act == "publish":              # {video, platforms} -> Adam pressed Post: posting.py drives his Chrome (own process)
+            job = cfg.get("post_jobs", {}).get(data["video"], {})
+            if job.get("state") == "posting": return self.send(200, {"error": "already posting this one"})
+            plats = [x for x in data.get("platforms", []) if x in ("youtube", "instagram")]
+            if not plats: return self.send(200, {"error": "pick YouTube and/or Instagram"})
+            cfg.setdefault("post_jobs", {})[data["video"]] = {"state": "posting", "detail": "starting…", "when": time.strftime("%Y-%m-%d %H:%M"), "platforms": plats}; save()
+            subprocess.Popen(["python3", str(HERE.parent / "posting.py"), str(p), data["video"], "--platforms", *plats],
+                             stdout=open(p / "work" / "posting.log", "a"), stderr=subprocess.STDOUT, start_new_session=True)
+            return self.send(200, {"started": True})
         if act == "caption":              # {video} -> Claude writes caption + hashtags + alt text in Adam's voice
             out = write_caption(p, data["video"])
             if "error" in out: return self.send(200, out)

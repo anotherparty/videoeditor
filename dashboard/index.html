@@ -384,6 +384,10 @@ function postPanel(o){
       <a class="btn small" href="${o.url}?dl=1">⬇ Video</a>
       <a class="btn small" href="https://www.instagram.com/" target="_blank" rel="noopener">Open Instagram ↗</a>
       <button class="btn small" data-savetags title="New videos start with these hashtags">Save hashtags as default</button></div>
+    ${(()=>{const job=((data.cfg.post_jobs||{})[n])||{}, P=o.posting||{}, todo=['youtube','instagram'].filter(k=>!P[k]);
+      return `<div class="row">${job.state==='posting'?`<span class="pill">⏳ Posting in your Chrome… ${esc(job.detail||'')}</span>`
+        :`<button class="btn small primary" data-publish="${n}" data-plats="${(todo.length?todo:['youtube','instagram']).join(',')}" ${q.caption?'':'disabled title="Write the caption first"'}>🚀 ${todo.length?'Post to '+todo.map(k=>({youtube:'YouTube',instagram:'Instagram'})[k]).join(' + '):'Post again'}</button>`}
+        ${job.state==='error'?`<span class="flag">⚠️ ${esc(job.detail)}</span>`:job.state==='done'?`<span class="muted" style="font-size:12px">✓ ${esc(job.detail)} ${esc(job.when||'')}</span>`:''}</div>`})()}
   </div>`;
 }
 function label(i){
@@ -468,6 +472,10 @@ function posts(){
     if(!ok){try{await navigator.clipboard.writeText(txt);ok=true}catch(e){}}
     b.textContent=ok?'✓ Copied':'Copy failed';
     setTimeout(()=>b.textContent='📋 Copy caption + hashtags',1800)});
+  document.querySelectorAll('[data-publish]').forEach(b=>b.onclick=async()=>{const n=b.dataset.publish, plats=b.dataset.plats.split(',');
+    const names=plats.map(k=>({youtube:'YouTube',instagram:'Instagram @anotherparty25'})[k]).join(' and ');
+    if(!confirm(`Post "${n}" to ${names} now?\n\nClaude will upload it in your Chrome with this caption and cover. This goes public.`))return;
+    b.disabled=true; const r=await post(`/api/p/${cur}/publish`,{video:n,platforms:plats}); if(r.error)alert(r.error); refresh(true)});
   document.querySelectorAll('[data-savetags]').forEach(b=>b.onclick=async()=>{const v=b.closest('.postp').querySelector('[data-pf=tags]').value;
     await fetch('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:'@anotherparty25',hashtags:v})});
     ACC['@anotherparty25']={hashtags:v};b.textContent='✓ Saved'});
