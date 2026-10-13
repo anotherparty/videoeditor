@@ -806,6 +806,19 @@ func makeGraphics(_ g: [String:Any], total: Double, contentDur: Double) -> [CALa
         let l = textCard(a, bg: NSColor(calibratedWhite: 0.04, alpha: 0.9), padX: 26, padY: 14, corner: 10, maxW: CGFloat(W) * 0.7, bar: brandRed)
         l.frame.origin = CGPoint(x: 40, y: freeZoneCenterY(l.bounds.height, start: st, end: en) - l.bounds.height / 2)
         addFadeWindow(l, showStart: st, showEnd: en, total: total, fade: 0.2); slideIn(l, at: st, dx: -420); out.append(l)
+    case "news":    // TV-news lower third: red kicker tab on a white headline bar, slides in from the left
+        let h = NSAttributedString(string: (g["headline"] as? String ?? "").uppercased(),
+            attributes: [.font: btbFont(40), .foregroundColor: NSColor(calibratedWhite: 0.07, alpha: 1), .kern: 0.5])
+        let bar = textCard(h, bg: .white, padX: 22, padY: 9, corner: 4, maxW: CGFloat(W) - 80, bar: brandRed)
+        let k = NSAttributedString(string: (g["kicker"] as? String ?? "BREAKING").uppercased(),
+            attributes: [.font: btbFont(24), .foregroundColor: NSColor.white, .kern: 2.5])
+        let tab = textCard(k, bg: brandRed, padX: 14, padY: 4, corner: 3, maxW: CGFloat(W) * 0.6)
+        let box = CALayer(); box.bounds = CGRect(x: 0, y: 0, width: max(bar.bounds.width, tab.bounds.width), height: bar.bounds.height + tab.bounds.height - 4)
+        bar.frame.origin = .zero; tab.frame.origin = CGPoint(x: 0, y: bar.bounds.height - 4)
+        box.addSublayer(bar); box.addSublayer(tab)
+        box.shadowColor = NSColor.black.cgColor; box.shadowOpacity = 0.45; box.shadowRadius = 12; box.shadowOffset = CGSize(width: 0, height: -4)
+        box.frame.origin = CGPoint(x: 40, y: freeZoneCenterY(box.bounds.height, start: st, end: en) - box.bounds.height / 2)
+        addFadeWindow(box, showStart: st, showEnd: en, total: total, fade: 0.2); slideIn(box, at: st, dx: -CGFloat(W)); out.append(box)
     case "place":   // place / date card: pin + PLACE, year in mint
         let a = NSMutableAttributedString(string: "📍 " + (g["place"] as? String ?? "").uppercased(),
             attributes: [.font: btbFont(78), .foregroundColor: NSColor.white, .kern: 2.0])

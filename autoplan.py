@@ -13,7 +13,8 @@ Plans, in priority order (later items never overlap earlier ones):
   3. place cards       a registry place with a year nearby                        ("📍 ATTICA 2010")
   3. your library     ~/Projects/Reels/_library files whose name (or library.json keys) is said -> B-roll
   4. stock B-roll      a registry place/thing with a "stock" query -> Pixabay video (split) or photo (full)
-  5. emoji pops        registry/emoji.json words, first use each, spaced out
+  5. news bars       strongest sentences (STRONG words, numbers) -> red/white TV lower third, <= 1 per 40s
+  6. emoji pops        registry/emoji.json words, first use each, spaced out
 Writes beats.json (source-time beats for editplan.py) and plan.json (every candidate, with id/why/on —
 the dashboard shows it and writes off.json to switch items off). Prints UNKNOWN NAMES for the registry.
 """
@@ -175,7 +176,29 @@ def main():
             add({"id": f"place:{pl['name']}", "type": "place", "place": pl["name"], "year": "",
                  "why": f"mention of {pl['name']}"}, s, min(s + 2.6, end_of(s)))
 
-    # 5. emoji: first use of each, at least 5s apart from each other
+    # 5. news lower thirds: only the strongest phrases (clause-sized, like a headline), at most one per ~40s
+    names = {norm(k) for x in people + places for k in x["keys"] for k in k.split()}
+    clauses, cur = [], []
+    for i, w in enumerate(words):
+        cur.append(i)
+        if re.search(r"[.,?!;:]$", w["word"].strip()) or i == len(words) - 1: clauses.append(cur); cur = []
+    scored = []
+    for k, ix in enumerate(clauses):
+        if len(ix) < 6 and k + 1 < len(clauses): ix = ix + clauses[k + 1]          # a short clause borrows the next one
+        hl = headline(" ".join(words[i]["word"].strip() for i in ix))
+        hw = [norm(w) for w in hl.split()]
+        if len(hw) < 4: continue
+        sc = 2 * sum(w in NEWS_STRONG for w in hw) + sum(w in names for w in hw) + 2 * sum(bool(re.fullmatch(r"(19|20)\d\d", w)) for w in hw) \
+             + sum(w in NEWS_TURN for w in hw)
+        scored.append((sc, words[ix[0]]["start"], hl))
+    span = sum(hi - lo for lo, hi in ranges); room = max(1, int(span // 40)); placed = []
+    for sc, s, hl in sorted(scored, key=lambda x: -x[0]):
+        if sc < 4 or len(placed) >= room or any(abs(s - p) < 30 for p in placed): continue
+        n0 = len([x for x in plan if x["on"]])
+        add({"id": f"news:{s:.0f}", "type": "news", "headline": hl, "kicker": "BREAKING", "why": f"strong line ({sc}): {hl}"}, s, min(s + 4.5, end_of(s)))
+        if len([x for x in plan if x["on"]]) > n0: placed.append(s)
+
+    # 6. emoji: first use of each, at least 5s apart from each other
     used, last = set(), -99.0
     for i, tk in enumerate(toks):
         two = tk + " " + toks[i + 1] if i + 1 < len(toks) else ""
@@ -198,6 +221,20 @@ def main():
     json.dump(beats, open(a.out, "w"), indent=1, ensure_ascii=False)
     if a.plan: json.dump(sorted(plan, key=lambda x: x["src"][0]), open(a.plan, "w"), indent=1, ensure_ascii=False)
     print(f"[autoplan] {len(beats)} beats on, {len(plan) - len(beats)} off -> {a.out}")
+
+NEWS_STRONG = {"miracle", "life", "free", "freedom", "released", "love", "loved", "never", "first", "home", "prison", "parole",
+               "amazing", "attica", "years", "decades", "hope", "sun", "died", "dead", "board", "denied", "granted"}
+NEWS_TURN = {"didn't", "never", "finally", "won't", "can't", "since", "still", "first", "last"}
+LEAD = r"^((from|inside|that|then|which|who|and|so|but|because|where|when)\s+)+"
+TRAIL = r"(\s+(and|so|but|that|the|a|to|of|with|they're|he's|she's|it's|i'm|was|is|in|on|my|his|her))+$"
+FILLER = r"\b(you know|i mean|kind of|sort of|like|um+|uh+|really|actually|just|basically|literally)\b,?"
+def headline(s, maxw=8):
+    """spoken sentence -> short news headline: drop filler and lead-ins, keep the strongest stretch of <= maxw words"""
+    s = re.sub(FILLER, " ", s, flags=re.I); s = re.sub(r"^(\W*(so|and|but|well|now|okay|ok|yeah)\b,?\s*)+", "", s.strip(), flags=re.I)
+    ws = [w for w in re.sub(r"[.?!,;:]+$", "", re.sub(r"\s+", " ", s)).split(" ") if w]
+    if len(ws) <= maxw: return re.sub(LEAD, "", re.sub(TRAIL, "", " ".join(ws).strip(" ,"), flags=re.I), flags=re.I)
+    best = max(range(len(ws) - maxw + 1), key=lambda i: sum(norm(w) in NEWS_STRONG or any(c.isdigit() for c in w) for w in ws[i:i + maxw]))
+    return re.sub(LEAD, "", re.sub(TRAIL, "", " ".join(ws[best:best + maxw]).strip(" ,"), flags=re.I), flags=re.I)
 
 def fetch(url, out=None):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh) stage-reel/1.0"})
