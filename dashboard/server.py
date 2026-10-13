@@ -199,6 +199,8 @@ def detail(pid, p):
     return {"id": pid, "path": str(p), "cfg": cfg,
             "look": f"/files/{pid}/out/look.jpg?v={int(look.stat().st_mtime)}" if look.exists() else None, "status": st, "running": running(p), "outputs": outs,
             "suggestions": jload(p / "work" / "suggestions.json", []), "log": log,
+            "pool": [{"name": f.name, "path": f"source/broll/{f.name}", "video": f.suffix.lower() in VIDS}
+                     for f in sorted((p / "source" / "broll").glob("*")) if f.suffix.lower() in VIDS | IMGS],
             "has_transcript": bool(cfg.get("video")) and (p / "work" / (Path(cfg["video"]).stem + ".json")).exists()}
 
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]"}
@@ -319,22 +321,25 @@ class H(BaseHTTPRequestHandler):
         p = projects().get(parts[2]) if len(parts) > 3 else None
         if not p or parts[3] != "upload": return self.send(404, {"error": "bad upload"})
         name = re.sub(r"[^\w.\- ]", "_", Path(q.get("name", ["file"])[0]).name)
-        src = p / "source"; src.mkdir(exist_ok=True)
+        cfg = jload(p / "project.json", {}); kind = q.get("kind", ["shot"])[0]
+        if kind == "video" and cfg.get("video") and q.get("replace", [""])[0] != "1": kind = "pool"   # a 2nd video never replaces the main one
+        src = p / "source" / ("broll" if kind == "pool" else ""); src.mkdir(parents=True, exist_ok=True)
         n = int(self.headers.get("Content-Length") or 0)
         with open(src / name, "wb") as fh:
             while n > 0:
                 chunk = self.rfile.read(min(1 << 20, n))
                 if not chunk: break
                 fh.write(chunk); n -= len(chunk)
-        cfg = jload(p / "project.json", {})
-        if q.get("kind", ["shot"])[0] == "broll":          # hand-placed B-roll: just store it, the drop says where it goes
+        if kind == "pool":                                  # this project's B-roll: in the tray, auto-placed when its name is said
+            return self.send(200, {"ok": True, "path": f"source/broll/{name}", "pool": True})
+        if kind == "broll":          # hand-placed B-roll: just store it, the drop says where it goes
             return self.send(200, {"ok": True, "path": f"source/{name}"})
-        if q.get("kind", ["shot"])[0] == "video":
+        if kind == "video":
             cfg["video"] = f"source/{name}"; cfg["reels"] = []
         else:
             cfg.setdefault("shots", []); cfg["shots"] = [s for s in cfg["shots"] if s != f"source/{name}"] + [f"source/{name}"]
         jsave(p / "project.json", cfg)
-        if q.get("kind", ["shot"])[0] == "video": spawn(p, "--suggest")      # transcribe + title ideas right away
+        if kind == "video": spawn(p, "--suggest")      # transcribe + title ideas right away
         self.send(200, {"ok": True})
 
     def do_POST(self):

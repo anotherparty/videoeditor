@@ -115,7 +115,7 @@ class Run:
         manual = self.work / "manual_broll.json"      # B-roll dragged onto transcript lines in the dashboard
         jsave(manual, [{**m, "path": str(self.p / m["path"])} for m in self.cfg.get("manual_broll", [])])
         self.sh(["python3", HERE / "autoplan.py", tj, "--cuts", cuts, "--work", self.work / "auto", "--out", self.work / f"{name}.beats.json",
-                 "--plan", self.work / f"{name}.plan.json", "--off", self.work / f"{name}.off.json", "--manual", manual, "--moves", self.work / f"{name}.moves.json", *(["--shots", *shots] if shots else []),
+                 "--plan", self.work / f"{name}.plan.json", "--off", self.work / f"{name}.off.json", "--manual", manual, "--moves", self.work / f"{name}.moves.json", "--pool", self.p / "source" / "broll", *(["--shots", *shots] if shots else []),
                  *(["--avoid", *self.cfg["shot_avoid"]] if self.cfg.get("shot_avoid") else [])])
         self.sh(["python3", HERE / "editplan.py", tj, "--cuts", cuts, self.work / f"{name}.beats.json", "--out", self.work / f"{name}.edit.json"])
         if plan_only: return

@@ -104,6 +104,7 @@ a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center}
 .tl.pending{opacity:.6;background-image:repeating-linear-gradient(45deg,transparent 0 6px,rgba(255,255,255,.35) 6px 12px)!important;outline:1px dashed #0006}
 .timeline.over{outline:2px dashed var(--red);outline-offset:-2px}
 .tltray{margin-bottom:6px}
+.tray .th.mine{border:2px solid var(--red)}
 .tlbar{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:3px 2px 6px}
 .tlbar a{color:var(--red);cursor:pointer}
 .tltip{position:fixed;pointer-events:none;background:#222;color:#fff;font-size:12px;padding:3px 7px;border-radius:6px;z-index:9;display:none}
@@ -245,10 +246,12 @@ function render(){
   ${stepBar(d)}
 
   ${sec('footage','1 · Footage',c.video?'🎬 '+esc(c.video.split('/').pop())+((c.shots||[]).length?` + ${c.shots.length} screenshots`:''):'',!!c.video&&(d.outputs||[]).some(o=>o.url))}
-  <div class="drop" id="drop"><b>Drop the video here</b>, plus any screenshots (articles, posts, letters) to show as B-roll.
+  <div class="drop" id="drop">${c.video?`<b>Main video is in.</b> More videos dropped here go to this project's B-roll (they never replace it). Screenshots (articles, posts, letters) become highlighted cards.`
+      :`<b>Drop the main video here</b>, plus any screenshots (articles, posts, letters) to show as highlighted cards.`}
     <div class="files">${c.video?`<span class="chipv">🎬 ${esc(c.video.split('/').pop())}</span>`:''}${shots}</div>
     <input type="file" id="pick" multiple accept="video/*,image/*" hidden>
-    <div style="margin-top:10px"><button class="btn small" id="browse">Choose files</button></div></div>
+    <div style="margin-top:10px"><button class="btn small" id="browse">Choose files</button>
+      ${c.video?`<button class="btn small" id="replace" title="Swap the main video for a different one">Replace main video…</button><input type="file" id="rpick" accept="video/*" hidden>`:''}</div></div>
 
   ${sec('look','2 · The look',esc(c.sticker||'')+' · '+({btb:'Books Through Bars',box:'White box',mono:'Typewriter'}[c.cap_style]||''),!!c.look_ok)}
   <div class="card">
@@ -284,6 +287,8 @@ function render(){
   ${sec('byhand','4 · B-roll by hand',(c.manual_broll||[]).length?(c.manual_broll.length+' placed'):'drag clips onto lines',!(c.manual_broll||[]).length)}
   <div class="card" id="byhand">${c.video?`
     <div class="muted" style="font-size:13px;margin-bottom:8px">Drag a clip onto the line where it should play, from your library below or straight from Finder. It beats the automatic picks. Then press <b>Render changes</b>.</div>
+    <div class="drop" id="pdrop" style="padding:12px;margin-bottom:8px"><b>Drop photos and clips for this project</b>. They wait in the tray below; drag one onto a line or the timeline.
+      Name a file after what you say (e.g. <i>kerber farm.jpg</i>) and it places itself when you say it.</div>
     <div class="tray" id="tray"></div><div class="lines" id="lines"><span class="muted">Loading the transcript…</span></div>`
     :'<span class="muted">Drop the video in first.</span>'}</div>
 
@@ -423,6 +428,15 @@ function wire(){
     $('#main').innerHTML='<div class="empty">Archived.</div>'; loadList()};
   const drop=$('#drop'),pick=$('#pick');
   $('#browse').onclick=()=>pick.click(); pick.onchange=()=>upload([...pick.files]);
+  if($('#replace')){const rp=$('#rpick'); $('#replace').onclick=()=>rp.click();
+    rp.onchange=async()=>{const f=rp.files[0]; if(!f||!confirm(`Replace the main video with ${f.name}? The reel list starts over.`))return;
+      drop.querySelector('b').textContent=`Uploading ${f.name}…`;
+      await fetch(`/api/p/${cur}/upload?name=${encodeURIComponent(f.name)}&kind=video&replace=1`,{method:'PUT',body:f}); refresh(true)}}
+  const pd=$('#pdrop'); if(pd){pd.ondragover=e=>{e.preventDefault();pd.classList.add('over')}; pd.ondragleave=()=>pd.classList.remove('over');
+    pd.ondrop=async e=>{e.preventDefault();pd.classList.remove('over');
+      for(const f of [...e.dataTransfer.files]){pd.querySelector('b').textContent=`Adding ${f.name}…`;
+        await fetch(`/api/p/${cur}/upload?name=${encodeURIComponent(f.name)}&kind=pool`,{method:'PUT',body:f})}
+      refresh(true)}}
   drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
   drop.ondragleave=()=>drop.classList.remove('over');
   drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');upload([...e.dataTransfer.files])};
@@ -503,8 +517,11 @@ function timelines(){
   document.querySelectorAll('[data-reset]').forEach(a=>a.onclick=async()=>{await post(`/api/p/${cur}/move_reset`,{video:a.dataset.reset});refresh(true)});
 }
 let LINES={id:null,rows:[]}, LIB=null, linesTop=0;
-const trayHTML=()=>LIB&&LIB.length?LIB.map(f=>`<div class="th" draggable="true" data-path="${esc(f.path)}" title="${esc(f.name)}"
-      style="${f.video?'':`background-image:url('/lib/${encodeURIComponent(f.name)}')`}"><span>${f.video?'🎬 ':''}${esc(f.name)}</span></div>`).join('')
+const thumb=(f,url,mine)=>`<div class="th ${mine?'mine':''}" draggable="true" data-path="${esc(f.path)}" title="${esc(f.name)}${mine?' (this project)':' (library)'}"
+      style="${f.video?'':`background-image:url('${url}')`}"><span>${f.video?'🎬 ':''}${esc(f.name)}</span></div>`;
+const trayHTML=()=>((data&&data.pool)||[]).length||(LIB&&LIB.length)?
+    ((data&&data.pool)||[]).map(f=>thumb(f,`/files/${cur}/${f.path.split('/').map(encodeURIComponent).join('/')}`,true)).join('')+
+    (LIB||[]).map(f=>thumb(f,`/lib/${encodeURIComponent(f.name)}`,false)).join('')
     :'<span class="muted" style="font-size:13px">Your library is empty. Put photos/clips in Projects/Reels/_library, or drag files from Finder.</span>';
 // a B-roll drop (library thumb or Finder file) -> hand-placed B-roll at that transcript time
 async function dropBroll(e,at,busy){
@@ -540,7 +557,7 @@ async function byHand(c){
 async function upload(files){
   const drop=$('#drop');
   for(const f of files){
-    const k=f.type.startsWith('video')?'video':'shot';
+    const k=f.type.startsWith('video')?'video':'shot';     // the server turns a 2nd video into project B-roll
     drop.querySelector('b').textContent=`Uploading ${f.name}…`;
     await fetch(`/api/p/${cur}/upload?name=${encodeURIComponent(f.name)}&kind=${k}`,{method:'PUT',body:f});
   }

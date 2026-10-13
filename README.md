@@ -95,6 +95,13 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   shows its credit on screen ("PHOTO: Jayu · CC BY-SA 2.0"). Attica now uses the 2007 front-gate shot, not the riot photo.
   Write caption also ends the caption with "Photo: Jayu, CC BY-SA 2.0 (creativecommons.org/licenses/by-sa/2.0)"
   for every credited photo that's switched on in that video (added by code, not by Claude).
+- 🗂 Project B-roll (Oct 12 2026): section 4 has a "Drop photos and clips for this project" box -> source/broll/. They show
+  first in the tray (red border) to drag onto a line or the timeline, and auto-place when their file name is said (same
+  rules as the library, project files first). Footage box safety: once a main video exists, another video dropped there
+  goes to project B-roll and never replaces it; "Replace main video…" (with a confirm) is the only way to swap it.
+- 📰 article.py + articlecard.swift (in progress): URL + exact passage -> clean news-page card with the highlighter sweep.
+  find_articles(): Claude searches the web for up to 2 articles backing what Adam says; each passage is checked
+  word-for-word against the fetched page. Not wired into autoplan yet.
 - ✋ Drop B-roll on the timeline (Oct 12 2026): a Wide video card has a library tray above its timeline. Drag a thumb
   (or a Finder file) onto the timeline: the drop's x position becomes the transcript time (3.8 s long) and is saved as
   hand-placed B-roll (`manual_broll`, same as a transcript-line drop). It shows as a dashed block until the next render.

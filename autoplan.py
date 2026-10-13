@@ -44,6 +44,7 @@ def main():
     ap.add_argument("--work", required=True); ap.add_argument("--out", required=True)
     ap.add_argument("--plan"); ap.add_argument("--off"); ap.add_argument("--manual", help="hand-placed B-roll [{path, start, end}] (source time)")
     ap.add_argument("--moves", help="timeline drags {id: [start, end]} (source time) from the dashboard")
+    ap.add_argument("--pool", help="this project's B-roll folder (source/broll): same rules as your library")
     ap.add_argument("--shots", nargs="*", default=[]); ap.add_argument("--no-stock", action="store_true")
     ap.add_argument("--avoid", nargs="*", default=[], help="text that must never appear on a screenshot card (e.g. a wrong date)")
     a = ap.parse_args()
@@ -162,11 +163,11 @@ def main():
              "why": f"first mention of {p['name']}"}, s, min(s + 3.2, end_of(s)))
 
     # 3. your own library (~/Projects/Reels/_library) beats Pixabay: a file plays when its name (or library.json keys) is said
-    for lf, keys in library():
+    for lf, keys in library(Path(a.pool) if a.pool else None):
         hit = find_key(keys)
         if not hit: continue
         s = words[hit[0]]["start"]; e = min(s + 3.8, end_of(s))
-        item = {"id": f"lib:{lf.name}", "type": "broll", "why": f"'{' '.join(toks[hit[0]:hit[0] + hit[1]])}' -> your library {lf.name}"}
+        item = {"id": f"lib:{lf.name}", "type": "broll", "why": f"'{' '.join(toks[hit[0]:hit[0] + hit[1]])}' -> {'this project' if a.pool and lf.parent == Path(a.pool) else 'your library'} {lf.name}"}
         if lf.suffix.lower() in VIDS: item.update(video=str(lf), layout="pip")    # your clip full screen, you in a framed corner box
         else: item.update(image=str(lf), kb=next(KB))
         add(item, s, e)
@@ -338,11 +339,12 @@ LIB = Path.home() / "Projects" / "Reels" / "_library"
 VIDS = {".mp4", ".mov", ".m4v"}
 LIB_SKIP = {"img", "photo", "video", "clip", "final", "copy", "edit", "the", "and", "with", "from", "for"}
 
-def library():
-    """[(file, keys)]: keys from library.json {"file.jpg": ["key", ...]} if listed, else the file name's words"""
-    if not LIB.is_dir(): return []
+def library(pool=None):
+    """[(file, keys)]: keys from library.json {"file.jpg": ["key", ...]} if listed, else the file name's words.
+    pool = this project's own B-roll folder; its files come first and follow the same rules."""
     side = load(LIB / "library.json", {}); out = []
-    for lf in sorted(LIB.iterdir()):
+    files = (sorted(pool.iterdir()) if pool and pool.is_dir() else []) + (sorted(LIB.iterdir()) if LIB.is_dir() else [])
+    for lf in files:
         if lf.suffix.lower() not in VIDS | {".jpg", ".jpeg", ".png"}: continue
         if lf.name in side: keys = side[lf.name]
         else:
