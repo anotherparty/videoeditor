@@ -282,6 +282,6 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   A real publish runs the first time Adam presses Post.
 
 ## Models (Oct 13 2026)
-Every `claude -p` call names its model. Never Opus (Adam's rule). Sonnet: reel picking (reelpick.py), captions (server ask_claude),
+Every `claude -p` call names its model. Never Opus 5 (Adam's rule); Opus 5.5 is fine. Opus 5.5: reel picking (reelpick.py, the planning call). Sonnet: captions (server ask_claude),
 headline polish + B-roll matching (autoplan.py), article finder (article.py), Chrome posting (posting.py). Haiku: frame
 description + the sign-in check (server.py). Tested: `claude --model haiku|sonnet` both answer; Fable needs paid credits.

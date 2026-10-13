@@ -105,7 +105,7 @@ def window_text(p, video):
 
 CLAUDE_STATE = Path.home() / ".config" / "another-party" / "claude_state.json"   # last result of calling Claude
 
-def ask_claude(prompt, timeout=180, model="sonnet"):   # sonnet thinks + writes, haiku does chores; never opus (Adam, Oct 13)
+def ask_claude(prompt, timeout=180, model="sonnet"):   # opus 5.5 plans, sonnet writes, haiku does chores; never Opus 5 (Adam, Oct 13)
     """claude -p -> (stdout, error); remembers whether Claude was signed in for the health check"""
     if not CLAUDE.exists(): return "", "Claude Code isn't installed"
     r = subprocess.run([str(CLAUDE), "--model", model, "-p", prompt, "--output-format", "text"], capture_output=True, text=True, timeout=timeout,
