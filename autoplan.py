@@ -179,12 +179,13 @@ def main():
         yr = next((re.sub(r"\D", "", words[j]["word"]) for j in range(max(0, i - 8), min(len(words), i + 9))
                    if re.fullmatch(r"(19[5-9]\d|20[0-3]\d)", re.sub(r"\D", "", words[j]["word"]))), "")
         arch = archive(pl["archive"], pl.get("archive_must", pl["name"]), work / "archive") if pl.get("archive") else None
-        archive_item = lambda s0, e0: add({"id": f"archive:{pl['name']}", "type": "broll", "image": arch["path"], "label": "ARCHIVE PHOTO",
-                                           "kb": next(KB), "why": f"archival: {arch['title']} ({arch['license']})"}, s0, e0)
+        archive_item = lambda s0, e0, f=False: add({"id": f"archive:{pl['name']}", "type": "broll", "image": arch["path"], "label": "ARCHIVE PHOTO",
+                                           "kb": next(KB), "why": f"archival: {arch['title']} ({arch['license']})"}, s0, e0, f)
         if pl.get("name") and yr:
+            room = arch and free(s, min(s + 6.5, end_of(s)))     # check card + photo together: the photo butts onto its own card
             add({"id": f"place:{pl['name']}", "type": "place", "place": pl["name"], "year": yr,
                  "why": f"{pl['name']} + {yr}"}, s, min(s + 3.0, end_of(s)))
-            if arch and free(s + 3.0, s + 6.5): archive_item(s + 3.0, min(s + 6.5, end_of(s)))     # the real place, right after its card
+            if room and plan[-1]["on"]: archive_item(s + 3.0, min(s + 6.5, end_of(s)), True)         # the real place, right after its card
         elif arch and free(s, min(s + 3.8, end_of(s))):
             archive_item(s, min(s + 3.8, end_of(s)))                                                  # real history beats stock
         elif pl.get("stock") and not a.no_stock:

@@ -87,6 +87,10 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   Stored in ~/Projects/Reels/_inspiration/ (not in this repo).
 - 🎞 Library page: drop files in, rename to change trigger words, remove. 🩺 Health check: Claude signed in (Test
   button), caption style file, Pixabay key, transcription, disk space, nightly backup, storage + cleanup.
+- 🏛 Archival stills (Oct 12 2026): a registry place with `archive` gets a public-domain Wikimedia Commons photo
+  ("ARCHIVE PHOTO", Ken Burns, you in a corner bubble) for 3.5 s right after its place card, or instead of stock.
+  Fix: the photo was always dropped because the 0.4 s gap rule counted its own place card as an overlap; card + photo
+  are now checked as one span. Proven on the Sal reel (Attica 1971 photo at 12-15 s, audio unchanged).
 
 ## Pieces
 
