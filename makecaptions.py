@@ -26,6 +26,7 @@ def main() -> int:
     ap.add_argument("--max-chars", type=int, default=24)
     ap.add_argument("--gap", type=float, default=0.45)
     ap.add_argument("--corrections", default=None)
+    ap.add_argument("--fixes", default=None, help='[{"t": source_sec, "from": "a", "to": "in"}]: fix one misheard word at that moment')
     a = ap.parse_args()
 
     ranges = []
@@ -42,6 +43,12 @@ def main() -> int:
         for w in seg.get("words", []):
             words.append(w)
     words.sort(key=lambda w: w["start"])
+    for fx in (json.load(open(a.fixes)) if a.fixes else []):     # one word at one moment, so "a" -> "in" can't hit other lines
+        core = lambda s: s.strip(" ,.?!;:\"").lower()
+        hit = min((w for w in words if abs(w["start"] - fx["t"]) < 0.6 and core(w["word"]) == core(fx["from"])),
+                  key=lambda w: abs(w["start"] - fx["t"]), default=None)
+        if hit: tail = hit["word"].rstrip()[len(hit["word"].rstrip().rstrip(",.?!;:")):]; hit["word"] = " " + fx["to"] + tail
+        else: print(f"[makecaptions] fix not found: {fx}", file=sys.stderr)
 
     # remap kept words to output time
     kept = []  # (out_start, out_end, text)
