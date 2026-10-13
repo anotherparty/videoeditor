@@ -42,6 +42,7 @@ def main():
     ap.add_argument("transcript"); ap.add_argument("--cuts", required=True)
     ap.add_argument("--work", required=True); ap.add_argument("--out", required=True)
     ap.add_argument("--plan"); ap.add_argument("--off"); ap.add_argument("--manual", help="hand-placed B-roll [{path, start, end}] (source time)")
+    ap.add_argument("--moves", help="timeline drags {id: [start, end]} (source time) from the dashboard")
     ap.add_argument("--shots", nargs="*", default=[]); ap.add_argument("--no-stock", action="store_true")
     ap.add_argument("--avoid", nargs="*", default=[], help="text that must never appear on a screenshot card (e.g. a wrong date)")
     a = ap.parse_args()
@@ -68,9 +69,13 @@ def main():
                     break
         return best
 
-    plan, taken = [], []      # taken = (start, end) source-time intervals
+    moves = {k: tuple(v) for k, v in (load(a.moves, {}) if a.moves else {}).items()}
+    plan, taken = [], list(moves.values())      # taken = (start, end) source-time intervals; your moved spans are reserved
     def free(s, e, gap=0.4): return all(e + gap <= t0 or s >= t1 + gap for t0, t1 in taken)
     def add(item, s, e, force=False):
+        if item["id"] in moves:           # you dragged it on the timeline: your span wins, and it's always on
+            s, e = moves[item["id"]]; force = True; item["moved"] = True; item["why"] += " (moved by you)"
+            taken[:] = [x for x in taken if x != tuple(moves[item["id"]])]
         item.update(src=[round(s, 2), round(e, 2)])
         item["on"] = item["id"] not in off and (force or free(s, e))
         if not item["on"] and item["id"] not in off: item["why"] += " (skipped: overlaps)"

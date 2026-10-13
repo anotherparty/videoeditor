@@ -59,6 +59,13 @@ thumbnails. Drag a thumbnail (or a file from Finder) onto a line: it plays while
 Stored as `manual_broll` [{path, start, end}] in project.json; pipeline passes it to autoplan `--manual`.
 Photos get the Ken Burns rotation; clips go picture-in-picture.
 
+**Drag timeline (Oct 12 2026).** Each video card's timeline: drag a block to move a graphic, drag its edge to
+stretch it (snaps to 0.1s, tooltip shows the time). Overlapping blocks get their own row; 28px per second,
+scrolls sideways, gridline every 5s; "⤢ Wide" stretches the card across the page. Saved as
+`work/<video>.moves.json` {id: [start, end]} (transcript time); autoplan gives moved items your span, always
+on, and automatic picks avoid it. "Reset moves" clears them. Positions are transcript time, so a block sits
+slightly off from the rendered video where dead air was cut.
+
 ## Pieces
 
 | file | job |

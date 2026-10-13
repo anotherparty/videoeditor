@@ -73,6 +73,8 @@ label.f{display:block;font-size:12.5px;font-weight:650;color:var(--muted);margin
 .sty small{font-size:12px;color:var(--muted)}
 .vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
 .vid{display:flex;flex-direction:column;gap:12px}
+.vid.wide{grid-column:1/-1}
+.wbtn{font-size:12px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 8px;cursor:pointer}
 .vid.off{opacity:.55}
 .vhead{display:flex;align-items:center;gap:8px}
 .vhead input{flex:1;font-weight:700;border:1px solid transparent;background:none;border-radius:8px;padding:4px 6px;margin-left:-6px}
@@ -82,8 +84,17 @@ video{width:150px;aspect-ratio:9/16;border-radius:10px;background:#1d1a17;object
 .ph{width:150px;aspect-ratio:9/16;border-radius:10px;background:#ece3d3;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:10px;flex:none}
 .meta{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px;min-width:0}
 .meta a{color:var(--ink);font-weight:600}
-.timeline{position:relative;height:26px;background:#f1e9db;border-radius:7px;overflow:hidden}
-.tl{position:absolute;top:3px;bottom:3px;border-radius:4px;min-width:5px;opacity:.9}
+.tlwrap{overflow-x:auto;border-radius:7px}
+.timeline{position:relative;min-width:100%;background:#f1e9db;border-radius:7px;overflow:hidden;touch-action:none;user-select:none;
+  background-image:repeating-linear-gradient(90deg,transparent 0 calc(var(--px5) - 1px),#e2d6c2 calc(var(--px5) - 1px) var(--px5))}
+.tl{position:absolute;height:28px;border-radius:5px;min-width:8px;opacity:.92;cursor:grab;font-size:10px;color:#fff;line-height:32px;padding:0 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl.moved{box-shadow:inset 0 0 0 2px #fff}
+.tl.drag{cursor:grabbing;opacity:1;z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.tl .h{position:absolute;top:0;bottom:0;width:7px;cursor:ew-resize;background:rgba(255,255,255,.35)}
+.tl .h.l{left:0}.tl .h.r{right:0}
+.tlbar{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:3px 2px 6px}
+.tlbar a{color:var(--red);cursor:pointer}
+.tltip{position:fixed;pointer-events:none;background:#222;color:#fff;font-size:12px;padding:3px 7px;border-radius:6px;z-index:9;display:none}
 .tl.off{opacity:.22}
 .plan{max-height:220px;overflow:auto;border-top:1px solid var(--line);padding-top:6px}
 .it{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0}
@@ -147,6 +158,7 @@ async function open(id){cur=id;try{localStorage.setItem('reelstudio.cur',id)}cat
 
 async function refresh(full){
   if(!cur)return; data=await api('/api/p/'+cur);
+  if(!data||data.error){cur=null;try{localStorage.removeItem('reelstudio.cur')}catch(e){}$('#main').innerHTML='<p class="muted">Pick a project on the left.</p>';return}
   if(full||!editing) render();
   clearTimeout(timer); timer=setTimeout(()=>refresh(false), data.running?2500:8000);
 }
@@ -221,7 +233,11 @@ function vidCard(o){
   const plan=o.plan||[], end=Math.max(1,...plan.map(i=>i.src[1]),
     o.window?parseFloat(o.window.split('-')[1]):1), start=o.window?parseFloat(o.window.split('-')[0]):0;
   const span=Math.max(1,end-start);
-  const tl=plan.map(i=>`<div class="tl ${i.on?'':'off'}" title="${esc(i.why)}" style="left:${(i.src[0]-start)/span*100}%;width:${(i.src[1]-i.src[0])/span*100}%;background:${COLORS[kind(i)]}"></div>`).join('');
+  const lanes=[], lane=[];     // overlapping blocks go on separate rows so every block can be grabbed
+  [...plan.keys()].sort((x,y)=>plan[x].src[0]-plan[y].src[0]).forEach(n=>{const i=plan[n];
+    let k=lanes.findIndex(e=>e<=i.src[0]);if(k<0){k=lanes.length;lanes.push(0)}lanes[k]=i.src[1];lane[n]=k});
+  const PX=28, tlW=Math.round(span*PX), tlH=Math.max(1,lanes.length)*32+6;
+  const tl=plan.map((i,n)=>`<div class="tl ${i.on?'':'off'} ${i.moved?'moved':''}" data-id="${esc(i.id)}" data-s="${i.src[0]}" data-e="${i.src[1]}" title="${esc(i.why)}" style="top:${4+lane[n]*32}px;left:${(i.src[0]-start)/span*100}%;width:${(i.src[1]-i.src[0])/span*100}%;background:${COLORS[kind(i)]}"><i class="h l"></i>${esc(label(i))}<i class="h r"></i></div>`).join('');
   const items=plan.map(i=>`<div class="it ${i.on?'':'off'}"><i class="k" style="background:${COLORS[kind(i)]}"></i>
     <span class="t">${fmt(i.src[0]-start)}</span><span class="w" title="${esc(i.why)}">${esc(label(i))}</span>
     <label class="sw"><input type="checkbox" data-tog="${esc(i.id)}" data-v="${o.name}" ${i.on?'checked':''}><span></span></label></div>`).join('');
@@ -229,15 +245,17 @@ function vidCard(o){
   const plat=[['instagram','Instagram'],['facebook','Facebook'],['youtube','YouTube']].map(([k,n])=>
     `<button class="pb ${P[k]?'done':''}" data-post="${k}" data-v="${o.name}">${P[k]?'✓ ':''}${n}${P[k]?' · '+esc(P[k]):''}</button>`).join('');
   const src=o.phone||o.url;
-  return `<div class="card vid ${o.on?'':'off'}">
-    <div class="vhead">${o.name==='full'?`<b style="flex:1">Full video</b>`:`<input value="${esc(o.tag)}" data-tag="${o.name}" title="Title tag for this reel">
+  return `<div class="card vid ${o.on?'':'off'} ${WIDE.has(o.name)?'wide':''}">
+    <div class="vhead">${plan.length?`<button class="wbtn" data-wide="${o.name}" title="Stretch this card across the page to edit its timeline">${WIDE.has(o.name)?'Narrow':'⤢ Wide'}</button>`:''}${o.name==='full'?`<b style="flex:1">Full video</b>`:`<input value="${esc(o.tag)}" data-tag="${o.name}" title="Title tag for this reel">
       <label class="sw" title="Make this reel"><input type="checkbox" data-reel="${o.name}" ${o.on?'checked':''}><span></span></label>`}</div>
     <div class="player">${src?`<video src="${src}#t=0.5" controls preload="metadata" playsinline></video>`:`<div class="ph">${o.on?'Not rendered yet':'Switched off'}</div>`}
       <div class="meta">${o.window?`<span>From ${fmt(start)} to ${fmt(end)}</span>`:''}
         ${o.url?`<a href="${o.url}?dl=1">Download full quality</a><span>${o.mb} MB · for Instagram upload</span>`:''}
         ${o.phone?`<a href="${o.phone}?dl=1">Download phone copy</a><span>${o.phone_mb} MB · for texting / review</span>`:''}
         <span>${plan.filter(i=>i.on).length} graphics planned</span></div></div>
-    ${plan.length?`<div class="timeline">${tl}</div><div class="plan">${items}</div>`:''}
+    ${plan.length?`<div class="tlwrap"><div class="timeline" data-v="${o.name}" data-start="${start}" data-span="${span}" style="width:${tlW}px;height:${tlH}px;--px5:${PX*5}px">${tl}</div></div>
+      <div class="tlbar"><span>${fmt(0)}</span><span>Drag a block to move it · drag its edge to stretch it${plan.some(i=>i.moved)?` · <a data-reset="${o.name}">Reset moves</a>`:''}</span><span>${fmt(span)}</span></div>
+      <div class="plan">${items}</div>`:''}
     <div><label class="f">Posted</label><div class="post">${plat}</div>
       <input class="note" style="margin-top:6px" placeholder="Waiting on… (e.g. Craig's OK)" data-note="${o.name}" value="${esc(P.note||'')}"></div>
   </div>`;
@@ -277,12 +295,38 @@ function wire(){
     await post(`/api/p/${cur}/posting`,{video:b.dataset.v,platform:b.dataset.post,value:v});refresh(true)});
   document.querySelectorAll('[data-note]').forEach(el=>{el.onfocus=()=>editing=true;
     el.onblur=async()=>{editing=false;await post(`/api/p/${cur}/posting`,{video:el.dataset.note,platform:'note',value:el.value})}});
-  byHand(data.cfg);
+  byHand(data.cfg); timelines();
   const drop=$('#drop'),pick=$('#pick');
   $('#browse').onclick=()=>pick.click(); pick.onchange=()=>upload([...pick.files]);
   drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
   drop.ondragleave=()=>drop.classList.remove('over');
   drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');upload([...e.dataTransfer.files])};
+}
+// timeline: drag a block to move it, drag an edge to stretch it; saved per video as source-time spans
+const WIDE=new Set();
+function timelines(){
+  document.querySelectorAll('[data-wide]').forEach(b=>b.onclick=()=>{const n=b.dataset.wide;WIDE.has(n)?WIDE.delete(n):WIDE.add(n);render()});
+  let tip=$('#tltip'); if(!tip){tip=document.createElement('div');tip.id='tltip';tip.className='tltip';document.body.appendChild(tip)}
+  document.querySelectorAll('.timeline[data-v]').forEach(tlEl=>{
+    const v=tlEl.dataset.v, start=+tlEl.dataset.start, span=+tlEl.dataset.span;
+    tlEl.querySelectorAll('.tl').forEach(b=>b.onpointerdown=e=>{
+      e.preventDefault(); editing=true; b.setPointerCapture(e.pointerId); b.classList.add('drag');
+      const mode=e.target.classList.contains('l')?'l':e.target.classList.contains('r')?'r':'m';
+      const s0=+b.dataset.s, e0=+b.dataset.e, x0=e.clientX, W=tlEl.getBoundingClientRect().width;
+      let s=s0, en=e0;
+      b.onpointermove=ev=>{
+        const d=Math.round((ev.clientX-x0)/W*span*10)/10;
+        if(mode==='m'){const len=e0-s0; s=Math.min(Math.max(start,s0+d),start+span-len); en=s+len}
+        if(mode==='l') s=Math.min(Math.max(start,s0+d),en-0.5);
+        if(mode==='r') en=Math.max(Math.min(start+span,e0+d),s+0.5);
+        b.style.left=(s-start)/span*100+'%'; b.style.width=(en-s)/span*100+'%';
+        tip.style.display='block'; tip.style.left=ev.clientX+12+'px'; tip.style.top=ev.clientY-30+'px';
+        tip.textContent=`${fmt(s-start)} → ${fmt(en-start)}  (${(en-s).toFixed(1)}s)`};
+      b.onpointerup=async()=>{b.onpointermove=b.onpointerup=null; b.classList.remove('drag'); tip.style.display='none'; editing=false;
+        if(Math.abs(s-s0)>0.05||Math.abs(en-e0)>0.05){await post(`/api/p/${cur}/move`,{video:v,id:b.dataset.id,s,e:en});refresh(true)}};
+    });
+  });
+  document.querySelectorAll('[data-reset]').forEach(a=>a.onclick=async()=>{await post(`/api/p/${cur}/move_reset`,{video:a.dataset.reset});refresh(true)});
 }
 let LINES={id:null,rows:[]}, LIB=null, linesTop=0;
 const mmss=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;

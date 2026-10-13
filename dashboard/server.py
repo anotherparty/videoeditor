@@ -231,6 +231,15 @@ class H(BaseHTTPRequestHandler):
                     if "tag" in data and data["tag"] != r.get("tag"): r["tag"] = data["tag"]; stale(r["name"])
                     if "on" in data: r["on"] = bool(data["on"])
             save(); return self.send(200, {"ok": True})
+        if act in ("move", "move_reset"):  # {video, id, s, e} -> timeline drag: that graphic's new source-time span
+            mp = p / "work" / f"{data['video']}.moves.json"; mv = jload(mp, {}) if act == "move" else {}
+            if act == "move": mv[data["id"]] = [round(float(data["s"]), 2), round(float(data["e"]), 2)]
+            json.dump(mv, open(mp, "w"), indent=1); stale(data["video"])
+            planp = p / "work" / f"{data['video']}.plan.json"; plan = jload(planp, [])   # show it moved right away
+            for it in plan:
+                if it["id"] in mv: it["src"] = mv[it["id"]]; it["moved"] = True
+            if plan: json.dump(plan, open(planp, "w"), indent=1, ensure_ascii=False)
+            return self.send(200, {"ok": True})
         if act == "toggle":               # {video, id, on} -> off-list for that video, output marked stale
             offp = p / "work" / f"{data['video']}.off.json"; off = set(jload(offp, []))
             (off.discard if data.get("on") else off.add)(data["id"])
