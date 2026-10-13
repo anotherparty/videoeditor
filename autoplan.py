@@ -178,8 +178,8 @@ def main():
         i = hit[0]; s = words[i]["start"]
         yr = next((re.sub(r"\D", "", words[j]["word"]) for j in range(max(0, i - 8), min(len(words), i + 9))
                    if re.fullmatch(r"(19[5-9]\d|20[0-3]\d)", re.sub(r"\D", "", words[j]["word"]))), "")
-        arch = archive(pl["archive"], pl.get("archive_must", pl["name"]), work / "archive") if pl.get("archive") else None
-        archive_item = lambda s0, e0, f=False: add({"id": f"archive:{pl['name']}", "type": "broll", "image": arch["path"], "label": "ARCHIVE PHOTO",
+        arch = archive(pl["archive"], pl.get("archive_must", pl["name"]), work / "archive", pl.get("archive_file")) if pl.get("archive") else None
+        archive_item = lambda s0, e0, f=False: add({"id": f"archive:{pl['name']}", "type": "broll", "image": arch["path"], "label": arch.get("credit") or "ARCHIVE PHOTO",
                                            "kb": next(KB), "why": f"archival: {arch['title']} ({arch['license']})"}, s0, e0, f)
         if pl.get("name") and yr:
             room = arch and free(s, min(s + 6.5, end_of(s)))     # check card + photo together: the photo butts onto its own card
@@ -353,15 +353,16 @@ def library():
 
 PD_LICENSES = ("public domain", "pd", "cc0", "no restrictions")
 
-def archive(q, must, cache: Path):
+def archive(q, must, cache: Path, pin=None):
     """Wikimedia Commons: a public-domain PHOTO whose title names the place (no attribution needed). Cached per query.
-    -> {"path", "title", "license"} or None"""
+    pin = one exact Commons file (registry "archive_file"), which may also be CC BY / CC BY-SA: it then carries a credit.
+    -> {"path", "title", "license", "credit"} or None"""
     cache.mkdir(parents=True, exist_ok=True)
-    slug = re.sub(r"\W+", "_", q.lower()).strip("_"); meta_p = cache / f"{slug}.json"
+    slug = re.sub(r"\W+", "_", (pin or q).lower()).strip("_"); meta_p = cache / f"{slug}.json"
     if meta_p.exists():
         m = load(meta_p, None); return m if m and Path(m["path"]).exists() else None
-    url = ("https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=30"
-           "&prop=imageinfo&iiprop=url|extmetadata|size&iiurlwidth=1080&gsrsearch=" + urllib.parse.quote(q))
+    api = "https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=imageinfo&iiprop=url|extmetadata|size&iiurlwidth=1080"
+    url = api + ("&titles=" + urllib.parse.quote(pin) if pin else "&generator=search&gsrnamespace=6&gsrlimit=30&gsrsearch=" + urllib.parse.quote(q))
     try: pages = json.loads(fetch(url)).get("query", {}).get("pages", {}).values()
     except Exception as ex: print(f"[autoplan] archive search failed: {ex}"); return None
     best = None
@@ -369,14 +370,18 @@ def archive(q, must, cache: Path):
         ii = (pg.get("imageinfo") or [{}])[0]; title = pg.get("title", "")
         lic = ii.get("extmetadata", {}).get("LicenseShortName", {}).get("value", "")
         if not re.search(r"\.(jpe?g|png|tiff?)$", title, re.I) or must.lower() not in title.lower(): continue
-        if not lic.lower().startswith(PD_LICENSES) or ii.get("width", 0) < 700: continue
+        if pin and title.replace(" ", "_") != pin.replace(" ", "_"): continue
+        ok = lic.lower().startswith(PD_LICENSES) or (pin and re.match(r"cc by(-sa)? \d", lic.lower()))
+        if not ok or ii.get("width", 0) < 700: continue
+        author = re.sub(r"<[^>]+>", "", ii.get("extmetadata", {}).get("Artist", {}).get("value", "")).split(" from ")[0].strip()
         score = (bool(re.search(r"\b(19|20)\d\d\b", title)), ii.get("width", 0))   # dated photos first, then biggest
-        if not best or score > best[0]: best = (score, ii.get("thumburl") or ii.get("url"), title, lic)
+        if not best or score > best[0]: best = (score, ii.get("thumburl") or ii.get("url"), title, lic, author)
     if not best: json.dump(None, open(meta_p, "w")); return None
     out = cache / f"{slug}.jpg"
     try: fetch(best[1], out)
     except Exception as ex: print(f"[autoplan] archive download failed: {ex}"); return None
-    m = {"path": str(out), "title": best[2].removeprefix("File:"), "license": best[3]}
+    m = {"path": str(out), "title": best[2].removeprefix("File:"), "license": best[3],
+         "credit": "" if best[3].lower().startswith(PD_LICENSES) else f"PHOTO: {best[4]} · {best[3]}"}
     json.dump(m, open(meta_p, "w"), indent=1); return m
 
 def stock(q, cache: Path, need: float):
