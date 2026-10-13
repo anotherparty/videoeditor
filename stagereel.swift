@@ -862,14 +862,52 @@ func makeGraphics(_ g: [String:Any], total: Double, contentDur: Double) -> [CALa
             a.addAttribute(.paragraphStyle, value: p, range: NSRange(location: 0, length: a.length))
             let card = textCard(a, bg: .clear, padX: 0, padY: 0, corner: 0, maxW: CGFloat(W) - 150)
             card.frame.origin = CGPoint(x: 75, y: cy - card.bounds.height / 2)
-            addFadeWindow(card, showStart: st, showEnd: en, total: total, fade: 0.2); slideIn(card, at: st, dx: -60); out.append(card)
+            addFadeWindow(card, showStart: st, showEnd: en, total: total, fade: 0.2); out.append(card)
+            // types on: one mask strip per line widens letter by letter (discrete steps), a red caret rides the last letter
+            let tw = ceil(a.boundingRect(with: CGSize(width: CGFloat(W) - 150, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin]).width) + 2
+            let ts = NSTextStorage(attributedString: a), lm = NSLayoutManager(), tc = NSTextContainer(size: CGSize(width: tw, height: .greatestFiniteMagnitude))
+            tc.lineFragmentPadding = 0; lm.addTextContainer(tc); ts.addLayoutManager(lm); lm.ensureLayout(for: tc)
+            let n = max(1, a.length), t0 = st + 0.1, tEnd = t0 + min(max(1.0, Double(n) * 0.04), (en - st) * 0.55)
+            let at = { (k: Int) in t0 + (tEnd - t0) * Double(k + 1) / Double(n) }      // time letter k appears
+            let ch = card.bounds.height, mask = CALayer(); mask.frame = card.bounds
+            var caret: [(Double, CGPoint)] = [], lineH: CGFloat = 0
+            let str = a.string as NSString
+            lm.enumerateLineFragments(forGlyphRange: NSRange(location: 0, length: lm.numberOfGlyphs)) { r, used, _, gr, _ in
+                let y = ch - r.maxY, up = r.height * 0.3; lineH = r.height     // strip reaches up into the (already typed) line above, never down
+                let s = CALayer(); s.backgroundColor = NSColor.black.cgColor; s.anchorPoint = .zero
+                s.bounds = CGRect(x: 0, y: 0, width: card.bounds.width + 40, height: r.height + up); s.position = CGPoint(x: -20, y: y)
+                var vals: [CGFloat] = [0], keys: [NSNumber] = [0]
+                // a letter shows up to where the next visible letter starts (heavy caps overhang their advance a little)
+                let gs = Array(gr.location..<NSMaxRange(gr)), xs = gs.map { r.minX + lm.location(forGlyphAt: $0).x }
+                let ink = gs.map { !(str.substring(with: NSRange(location: lm.characterIndexForGlyph(at: $0), length: 1)).trimmingCharacters(in: .whitespaces).isEmpty) }
+                for (j, g) in gs.enumerated() {
+                    let k = lm.characterIndexForGlyph(at: g), nx = (j + 1..<gs.count).first { ink[$0] }
+                    let x = nx.map { xs[$0] - 1 } ?? used.maxX + 6, last = nx == nil
+                    vals.append(last ? card.bounds.width + 40 : x + 20); keys.append(NSNumber(value: min(0.9999, at(k) / total)))
+                    caret.append((at(k), CGPoint(x: card.frame.minX + x + 3, y: card.frame.minY + y + r.height * 0.5)))
+                }
+                vals.append(vals.last!); keys.append(1)
+                let grow = CAKeyframeAnimation(keyPath: "bounds.size.width"); grow.values = vals; grow.keyTimes = keys; grow.calculationMode = .discrete
+                grow.beginTime = AVCoreAnimationBeginTimeAtZero; grow.duration = total; grow.isRemovedOnCompletion = false; grow.fillMode = .forwards
+                s.add(grow, forKey: "type"); mask.addSublayer(s)
+            }
+            card.mask = mask
+            if let c0 = caret.first {
+                let cl = CALayer(); cl.backgroundColor = brandRed.cgColor; cl.bounds = CGRect(x: 0, y: 0, width: 9, height: lineH * 0.72)
+                cl.position = CGPoint(x: card.frame.minX + 4, y: c0.1.y)
+                let mv = CAKeyframeAnimation(keyPath: "position"); mv.calculationMode = .discrete
+                mv.values = [NSValue(point: cl.position)] + caret.map { NSValue(point: $0.1) } + [NSValue(point: caret.last!.1)]
+                mv.keyTimes = [0] + caret.map { NSNumber(value: min(0.9999, $0.0 / total)) } + [1]
+                mv.beginTime = AVCoreAnimationBeginTimeAtZero; mv.duration = total; mv.isRemovedOnCompletion = false; mv.fillMode = .forwards
+                cl.add(mv, forKey: "ride"); addWindow(cl, showStart: st + 0.05, showEnd: min(en, tEnd + 0.7), total: total); out.append(cl)
+            }
             let qa = NSAttributedString(string: "\u{201C}", attributes: [.font: NSFont(name: "Georgia-Bold", size: 300) ?? btbFont(300), .foregroundColor: brandRed])
             let ql = textCard(qa, bg: .clear, padX: 0, padY: 0, corner: 0, maxW: 400)
             ql.frame.origin = CGPoint(x: 62, y: card.frame.maxY - ql.bounds.height * 0.42)
             addFadeWindow(ql, showStart: st, showEnd: en, total: total, fade: 0.15); addPop(ql, at: st, from: 1.4); out.append(ql)
             let (bi, bs) = bigText("\u{2014} ADAM ROBERTS", size: 34, color: brandRed)
             let bl = CALayer(); bl.contents = bi; bl.frame = CGRect(x: 75, y: card.frame.minY - bs.height - 30, width: bs.width, height: bs.height)
-            addFadeWindow(bl, showStart: st + 0.3, showEnd: en, total: total, fade: 0.2); out.append(bl)
+            addFadeWindow(bl, showStart: tEnd, showEnd: en, total: total, fade: 0.2); out.append(bl)
         }
     case "news":    // TV-news lower third: red kicker tab on a white headline bar, slides in from the left
         let h = NSAttributedString(string: (g["headline"] as? String ?? "").uppercased(),

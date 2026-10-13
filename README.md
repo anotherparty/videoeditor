@@ -53,6 +53,15 @@ strongest word in red, a red serif quote mark, "— ADAM ROBERTS", Adam in the c
 phrase the news bars didn't use, one per video. Stat card: the number + unit said most often ("24 HOURS",
 "two hours" -> 2 HOURS) as a huge red number. Captions hide while a card is up (the card shows the words).
 
+**Quote types on (Oct 13 2026).** The quote card's line now types on letter by letter instead of sliding in: the
+same text image, masked by one strip per line that widens a letter at a time (discrete CoreAnimation steps), with a
+red caret riding the last letter. A letter shows up to where the next one starts (Avenir Heavy caps overhang their
+advance, so cutting at the advance left half an A). Typing starts 0.1 s in and takes 0.04 s a letter, capped at 55%
+of the card, so the full line holds for reading; the caret stays 0.7 s after the last letter, and "— ADAM ROBERTS"
+fades in when typing ends. Stat cards are unchanged. Tested on a 4.5 s card ("I got a fellowship at Sing Sing
+Prison Museum this summer"): frames at 6.25 / 6.5 / 6.9 / 7.2 / 7.6 / 8.0 / 8.3 / 8.6 s show I G| -> FE| -> A| ->
+PRISO| -> SUMM| -> full; the finished card matches the old renderer's pixel for pixel (JPEG noise only).
+
 **B-roll by hand (Oct 12 2026).** Dashboard section 4 shows the transcript as short lines and your library as
 thumbnails. Drag a thumbnail (or a file from Finder) onto a line: it plays while that line is said (at least
 2.5s), beats every automatic pick, and only the videos covering that moment re-render. ✕ removes it.
