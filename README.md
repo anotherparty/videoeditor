@@ -109,6 +109,14 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
 - ✋ Drop B-roll on the timeline (Oct 12 2026): a Wide video card has a library tray above its timeline. Drag a thumb
   (or a Finder file) onto the timeline: the drop's x position becomes the transcript time (3.8 s long) and is saved as
   hand-placed B-roll (`manual_broll`, same as a transcript-line drop). It shows as a dashed block until the next render.
+- 📷 Photos in the Footage box become B-roll (Oct 12 2026): an image dropped in Footage is read with ocr.swift. 6 or fewer
+  text lines = a photo -> project B-roll (source/broll/); more = a highlighted screenshot card as before. A camera-less
+  image whose big text fills 30%+ of the frame (a title card, e.g. Phil's "Another Day In Paradise" cover, 6 lines) stays
+  a card; camera photos (EXIF make) with a sign or a shirt go to B-roll. Tested on 17 real images: all 14 one-year photos
+  -> B-roll, all 3 Another Day screenshots -> cards. HEIC/HEIF is converted to .jpg with sips (the jpg is kept, the HEIC
+  dropped) for Footage, project B-roll, transcript/timeline drops and the library. one-year migrated: all 14 shots were
+  photos, copied to source/broll/ (IMG_3699.HEIC -> IMG_3699.jpg; IMG_6227 6233 6387 6389 6397 6398 6399 6400 6415 6448,
+  photo-18321 18382 18408) and taken out of `shots` (now empty); the originals stay in source/.
 
 ## Pieces
 

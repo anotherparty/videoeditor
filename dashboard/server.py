@@ -62,6 +62,18 @@ def stale_out(p, n):
 
 LIB = Path.home() / "Projects" / "Reels" / "_library"
 VIDS, IMGS = {".mp4", ".mov", ".m4v"}, {".jpg", ".jpeg", ".png"}
+def heic_jpg(f):     # iPhone HEIC/HEIF -> .jpg (sips); keep the jpg, drop the HEIC: nothing downstream reads HEIC
+    if f.suffix.lower() not in (".heic", ".heif"): return f
+    j = f.with_suffix(".jpg")
+    if subprocess.run(["sips", "-s", "format", "jpeg", str(f), "--out", str(j)], capture_output=True).returncode or not j.exists(): return f
+    f.unlink(); return j
+def is_photo(f):     # a plain photo (-> B-roll pool), not a text screenshot (-> highlighted card)
+    try: ln = next(iter(json.loads(subprocess.run(["swift", str(SKILL / "ocr.swift"), str(f)], capture_output=True,
+                                                    text=True, timeout=180).stdout or "{}").values()), {}).get("lines", [])
+    except Exception: return False                  # can't tell: keep it a screenshot card, as before
+    cam = re.search(r"make: (?!<nil>)\S", subprocess.run(["sips", "-g", "make", str(f)], capture_output=True, text=True).stdout)
+    # 6 or fewer text lines (signs, shirts) = a photo; but a camera-less title card (big text filling the frame) stays a card
+    return len(ln) <= 6 and (cam or sum(l["y1"] - l["y0"] for l in ln) < 0.3)
 sys.path.insert(0, str(HERE.parent)); from pipeline import EDITS, edit_args     # "How tight?" options, one definition
 
 def tightness(p):
@@ -320,7 +332,7 @@ class H(BaseHTTPRequestHandler):
                     chunk = self.rfile.read(min(1 << 20, n))
                     if not chunk: break
                     fh.write(chunk); n -= len(chunk)
-            return self.send(200, {"ok": True})
+            heic_jpg(LIB / name); return self.send(200, {"ok": True})
         if parts[:2] == ["api", "inspiration"]:        # a screenshot / clip for the look board
             INSP.mkdir(parents=True, exist_ok=True)
             name = time.strftime("%Y%m%d-%H%M%S-") + re.sub(r"[^\w.\- ]", "_", Path(q.get("name", ["file"])[0]).name)
@@ -345,6 +357,9 @@ class H(BaseHTTPRequestHandler):
                 chunk = self.rfile.read(min(1 << 20, n))
                 if not chunk: break
                 fh.write(chunk); n -= len(chunk)
+        name = heic_jpg(src / name).name
+        if kind == "shot" and Path(name).suffix.lower() in IMGS and is_photo(src / name):   # a plain photo, not a screenshot
+            (p / "source" / "broll").mkdir(exist_ok=True); os.replace(src / name, p / "source" / "broll" / name); kind = "pool"
         if kind == "pool":                                  # this project's B-roll: in the tray, auto-placed when its name is said
             return self.send(200, {"ok": True, "path": f"source/broll/{name}", "pool": True})
         if kind == "broll":          # hand-placed B-roll: just store it, the drop says where it goes

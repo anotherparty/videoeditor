@@ -250,8 +250,8 @@ function render(){
   ${stepBar(d)}
 
   ${sec('footage','1 · Footage',c.video?'🎬 '+esc(c.video.split('/').pop())+((c.shots||[]).length?` + ${c.shots.length} screenshots`:''):'',!!c.video&&(d.outputs||[]).some(o=>o.url))}
-  <div class="drop" id="drop">${c.video?`<b>Main video is in.</b> More videos dropped here go to this project's B-roll (they never replace it). Screenshots (articles, posts, letters) become highlighted cards.`
-      :`<b>Drop the main video here</b>, plus any screenshots (articles, posts, letters) to show as highlighted cards.`}
+  <div class="drop" id="drop">${c.video?`<b>Main video is in.</b> More videos and plain photos dropped here go to this project's B-roll (videos never replace it). Text screenshots (articles, posts, letters) become highlighted cards.`
+      :`<b>Drop the main video here</b>, plus photos (they go to B-roll) and text screenshots (articles, posts, letters), which become highlighted cards.`}
     <div class="files">${c.video?`<span class="chipv">🎬 ${esc(c.video.split('/').pop())}</span>`:''}${shots}</div>
     <input type="file" id="pick" multiple accept="video/*,image/*" hidden>
     <div style="margin-top:10px"><button class="btn small" id="browse">Choose files</button>
