@@ -14,7 +14,7 @@ find_articles() is the "I find them myself" part: Claude reads the transcript, s
 2 articles + a passage; each passage is then checked word-for-word against the fetched page (no invented quotes).
 autoplan.py calls it once per project (cached in work/articles.json); the cards arrive switched ON (Adam switches off).
 """
-import argparse, json, os, re, subprocess, sys, urllib.request
+import argparse, json, os, re, subprocess, sys, time, urllib.request
 from pathlib import Path
 from bs4 import BeautifulSoup
 
@@ -40,6 +40,11 @@ Reply with JSON only: {"articles": [{"t": <seconds>, "said": "<his words>", "abo
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 squash = lambda s: re.sub(r"\s+", " ", s.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')).strip()
 
+def short_outlet(o):
+    """'River Journal Online - News for Tarrytown, Sleepy Hollow, ...' -> 'River Journal Online' (card + dashboard row)"""
+    o = re.split(r"\s+[|\-–—]\s+|\s*[|–—]\s*|:\s+", squash(o))[0].strip() or o
+    return o if len(o) <= 32 else o[:31].rsplit(" ", 1)[0].rstrip(",;") + "…"
+
 def fetch(url):
     """-> {outlet, title, byline, date, paras} (paras = body paragraphs, cleaned)"""
     html = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=20).read().decode("utf-8", "replace")
@@ -47,7 +52,8 @@ def fetch(url):
     meta = lambda *ks: next((m.get("content", "").strip() for k in ks for m in s.find_all("meta", attrs={"property": k}) + s.find_all("meta", attrs={"name": k}) if m.get("content")), "")
     title = meta("og:title", "twitter:title") or (s.h1.get_text(" ", strip=True) if s.h1 else "")
     outlet = meta("og:site_name") or re.sub(r"^www\.", "", urllib.request.urlparse(url).netloc)
-    title = re.sub(rf"\s*[|\-–—]\s*{re.escape(outlet)}\s*$", "", title, flags=re.I)       # "Headline | Outlet" -> "Headline"
+    for o in {outlet, short_outlet(outlet)}: title = re.sub(rf"\s*[|\-–—]\s*{re.escape(o)}\s*$", "", title, flags=re.I)   # "Headline | Outlet" -> "Headline"
+    outlet = short_outlet(outlet)
     for t in s(["script", "style", "nav", "header", "footer", "aside", "form", "figure"]): t.decompose()
     body = s.find("article") or s.find("main") or s.body or s
     paras = [squash(p.get_text(" ", strip=True)) for p in body.find_all("p")]
@@ -85,14 +91,19 @@ def find_articles(lines, cache_p: Path):
     Cached in cache_p; any failure (no Claude, timeout, nothing verified) -> [] and the reel renders without articles."""
     if cache_p.exists(): return json.load(open(cache_p))
     if not CLAUDE.exists() or os.environ.get("REELSTUDIO_NO_CLAUDE") == "1": return []
+    failed = cache_p.with_suffix(".failed")             # Claude failed/timed out lately: don't ask again for every video (retry after 6 h)
+    if failed.exists() and time.time() - failed.stat().st_mtime < 6 * 3600: print("[article] finder failed lately, skipped (retries 6 h after)"); return []
     body = "\n".join(f"[{s:.1f}] {tx}" for s, tx in lines)[:12000]
     try:
         r = subprocess.run([str(CLAUDE), "-p", FIND_PROMPT + "\n# What Adam says\n" + body, "--output-format", "text",
                             "--allowedTools", "WebSearch", "WebFetch"], capture_output=True, text=True, timeout=420,
                            stdin=subprocess.DEVNULL, cwd=str(Path.home()))
-        m = re.search(r"\{.*\}", r.stdout, re.S); picks = json.loads(m.group(0)).get("articles", []) if m else []
+        m = re.search(r"\{.*\}", r.stdout, re.S)
+        if not m: raise RuntimeError(f"no JSON from Claude (exit {r.returncode})")
+        picks = json.loads(m.group(0)).get("articles", [])
     except Exception as ex:
-        print(f"[article] finder skipped ({type(ex).__name__})"); return []
+        print(f"[article] finder skipped ({type(ex).__name__}: {ex})"[:200]); failed.write_text(f"{type(ex).__name__}: {ex}"[:500]); return []
+    failed.unlink(missing_ok=True)
     found = []
     for pk in picks[:2]:
         try:

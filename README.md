@@ -117,6 +117,15 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   6.5 s, highlight sweeps in 0.6 s after it appears, headline/body readable, Adam's head under the seam, never covered;
   loudness peak -0.9 / RMS -17.3 (reel) and -17.5 (full) dBFS. Switching it off on the dashboard wrote off.json and the
   re-plan kept it listed, off, with a B-roll photo taking the gap.
+- 🗞 Article card fixes (Oct 13 2026, after review): (1) the card only starts on a word that names the subject ("about"
+  words) said in this video's cuts, searched in every line holding Claude's t or starting within 1 s of it; no more
+  "line start" fallback. Claude's t=85.5 sat on the end of the line before "I got a fellowship at Sing Sing Prison
+  Museum", so the River Journal card landed at 62.9 s in reel_redemption (a reel that never says Sing Sing). Now that
+  reel gets no card, and reel_off + full get it on "Sing" at 89.31 s. (2) Long site names are cut to the outlet
+  (article.short_outlet: "River Journal Online - News for Tarrytown, ..." -> "River Journal Online") on the card and in
+  the plan; the dashboard link also shrinks with "…" (max 34% of the row) so the headline and off switch always show.
+  (3) If Claude fails or times out, work/articles.failed is written and the finder is not asked again for 6 h, so a
+  project's other videos don't each wait up to 420 s.
 - ✂️ How tight? (Oct 12 2026): project setting `edit` = light (long pauses) / clean (+ every um and uh, default) /
   ruthless (shorter pauses + stutters and doubled words). transcribe.py --fillers makes Whisper write the ums down
   (one-year: 0 -> 6 found); deadair.py --drop-fillers/--drop-repeats cuts them. The Look section shows seconds each

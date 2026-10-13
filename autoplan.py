@@ -170,11 +170,15 @@ def main():
             dom = re.sub(r"^www\.", "", urllib.parse.urlparse(ar["url"]).netloc); aid = f"article:{dom}"
             if aid in seen_ids: aid += f"@{ar['t']:.0f}"
             seen_ids.add(aid)
-            sg = next((x for x in segs_all if x["start"] - 0.6 <= ar["t"] <= x["end"]), None)
-            lw = [w for w in words if (sg["start"] - 0.05 if sg else ar["t"] - 3) <= w["start"] <= (sg["end"] if sg else ar["t"] + 5)]
-            kw = {norm(x) for x in ar.get("about", "").split() if len(x) >= 4}
-            w0 = next((w for w in lw if norm(w["word"]) in kw), lw[0] if lw else None)    # the word that names it, else the line start
-            if w0 is None: continue                                                           # not in this video's cuts
+            # the line(s) at t: every segment holding t or starting within 1 s of it (t=85.5 sits on the end of one line
+            # AND the start of the next), then the word that names it inside them. No naming word in this video's cuts ->
+            # no card here (never fall back to a line start: that put a Sing Sing card 20 s before he said Sing Sing)
+            sgs = [x for x in segs_all if x["start"] - 1.0 <= ar["t"] <= x["end"]]
+            hi_t = max((x["end"] for x in sgs), default=ar["t"] + 8)
+            kw = {norm(x) for x in re.findall(r"[A-Za-z0-9']+", ar.get("about", "")) if len(x) >= 4}
+            w0 = min((w for w in words if ar["t"] - 1.0 <= w["start"] <= hi_t and norm(w["word"]) in kw),
+                     key=lambda w: abs(w["start"] - ar["t"]), default=None)
+            if w0 is None: continue                                                           # not named in this video's cuts
             s = w0["start"]; r_ = next(r for r in ranges if r[0] <= s <= r[1])
             if r_[1] - s < 0.5: s = min((lo for lo, hi in ranges if lo > s), default=s)     # don't open on the last sliver before a cut
             o_e = out_t(s) + 6.5                                                              # 6.5 s on screen, in finished-video time
@@ -184,8 +188,9 @@ def main():
             if not cj.exists():
                 try: article.make_card(ar["url"], [ar["mark"]], cj.with_suffix(".jpg"))
                 except Exception as ex: print(f"[autoplan] article card failed for {ar['url']}: {ex}"); continue
-            add({"id": aid, "type": "broll", "card": str(cj), "kb": "none", "layout": "split", "outlet": ar["outlet"], "url": ar["url"],
-                 "why": f"{ar['outlet']}: {ar['title']} ({ar['url']})"}, s, e)
+            outlet = article.short_outlet(ar["outlet"])
+            add({"id": aid, "type": "broll", "card": str(cj), "kb": "none", "layout": "split", "outlet": outlet, "url": ar["url"],
+                 "why": f"{outlet}: {ar['title']} ({ar['url']})"}, s, e)
 
     # 2. name labels (first mention)
     for p in people:
