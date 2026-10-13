@@ -8,7 +8,7 @@ Projects live in ~/Projects/Reels/<slug>/ (new ones are made there). Older proje
 are listed in Reels/_index.json (a JSON list of absolute paths). Each project folder = project.json + source files,
 work/, out/, out/phone/, status.json (see ../pipeline.py).
 """
-import json, os, re, subprocess, sys, threading, time, urllib.parse
+import filecmp, json, os, re, subprocess, sys, threading, time, urllib.parse
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 
@@ -62,11 +62,15 @@ def stale_out(p, n):
 
 LIB = Path.home() / "Projects" / "Reels" / "_library"
 VIDS, IMGS = {".mp4", ".mov", ".m4v"}, {".jpg", ".jpeg", ".png"}
+def free(d, name, src):  # a path in d for name that never clobbers a different file (same bytes = same file, reuse it)
+    f, i = d / name, 1
+    while f.exists() and not filecmp.cmp(src, f, shallow=False): f = d / f"{Path(name).stem}-{i}{Path(name).suffix}"; i += 1
+    return f
 def heic_jpg(f):     # iPhone HEIC/HEIF -> .jpg (sips); keep the jpg, drop the HEIC: nothing downstream reads HEIC
     if f.suffix.lower() not in (".heic", ".heif"): return f
-    j = f.with_suffix(".jpg")
-    if subprocess.run(["sips", "-s", "format", "jpeg", str(f), "--out", str(j)], capture_output=True).returncode or not j.exists(): return f
-    f.unlink(); return j
+    t = f.with_name(f".{f.stem}.heic-tmp.jpg")
+    if subprocess.run(["sips", "-s", "format", "jpeg", str(f), "--out", str(t)], capture_output=True).returncode or not t.exists(): return f
+    j = free(f.parent, f.stem + ".jpg", t); os.replace(t, j); f.unlink(); return j
 def is_photo(f):     # a plain photo (-> B-roll pool), not a text screenshot (-> highlighted card)
     try: ln = next(iter(json.loads(subprocess.run(["swift", str(SKILL / "ocr.swift"), str(f)], capture_output=True,
                                                     text=True, timeout=180).stdout or "{}").values()), {}).get("lines", [])
@@ -359,7 +363,8 @@ class H(BaseHTTPRequestHandler):
                 fh.write(chunk); n -= len(chunk)
         name = heic_jpg(src / name).name
         if kind == "shot" and Path(name).suffix.lower() in IMGS and is_photo(src / name):   # a plain photo, not a screenshot
-            (p / "source" / "broll").mkdir(exist_ok=True); os.replace(src / name, p / "source" / "broll" / name); kind = "pool"
+            (p / "source" / "broll").mkdir(exist_ok=True); d = free(p / "source" / "broll", name, src / name)
+            os.replace(src / name, d); name, kind = d.name, "pool"
         if kind == "pool":                                  # this project's B-roll: in the tray, auto-placed when its name is said
             return self.send(200, {"ok": True, "path": f"source/broll/{name}", "pool": True})
         if kind == "broll":          # hand-placed B-roll: just store it, the drop says where it goes

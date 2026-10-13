@@ -117,6 +117,10 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   dropped) for Footage, project B-roll, transcript/timeline drops and the library. one-year migrated: all 14 shots were
   photos, copied to source/broll/ (IMG_3699.HEIC -> IMG_3699.jpg; IMG_6227 6233 6387 6389 6397 6398 6399 6400 6415 6448,
   photo-18321 18382 18408) and taken out of `shots` (now empty); the originals stay in source/.
+  Follow-up (Oct 12 2026): moving a photo into source/broll/ or converting a HEIC never overwrites a different file of
+  the same name (it becomes NAME-1.jpg; the identical file dropped again is reused, no duplicate). The live dashboard was
+  restarted after the last edit and re-tested on it: the 6-line title card stays a card, a 2nd photo named IMG_6400.JPG
+  lands as IMG_6400-1.JPG. _library/IMG_3699.HEIC (copied in before this) converted to IMG_3699.jpg.
 
 ## Pieces
 
