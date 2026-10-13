@@ -806,16 +806,45 @@ func makeGraphics(_ g: [String:Any], total: Double, contentDur: Double) -> [CALa
         let l = textCard(a, bg: NSColor(calibratedWhite: 0.04, alpha: 0.9), padX: 26, padY: 14, corner: 10, maxW: CGFloat(W) * 0.7, bar: brandRed)
         l.frame.origin = CGPoint(x: 40, y: freeZoneCenterY(l.bounds.height, start: st, end: en) - l.bounds.height / 2)
         addFadeWindow(l, showStart: st, showEnd: en, total: total, fade: 0.2); slideIn(l, at: st, dx: -420); out.append(l)
+    case "quote":   // quote card (big line, hot word in red) or stat card (huge red number + label) on a cream B-roll
+        let ink = NSColor(calibratedWhite: 0.08, alpha: 1), cy = CGFloat(H) * 0.64
+        if let num = g["num"] as? String {
+            let (ni, ns) = bigText(num.uppercased(), size: 300, color: brandRed)
+            let nl = centered(ni, ns, y: cy + 140); addFadeWindow(nl, showStart: st, showEnd: en, total: total, fade: 0.15); addPop(nl, at: st, from: 1.5); out.append(nl)
+            let (li, ls) = bigText((g["label"] as? String ?? "").uppercased(), size: 80, color: ink)
+            let ll = centered(li, ls, y: cy + 140 - ns.height / 2 - 20); addFadeWindow(ll, showStart: st + 0.2, showEnd: en, total: total, fade: 0.2); out.append(ll)
+        } else {
+            let hot = (g["hot"] as? String ?? "").lowercased()
+            let a = NSMutableAttributedString()
+            for (i, w) in (g["text"] as? String ?? "").uppercased().split(separator: " ").enumerated() {
+                let isHot = !hot.isEmpty && w.lowercased().filter { $0.isLetter || $0.isNumber || $0 == "'" } == hot
+                a.append(NSAttributedString(string: (i > 0 ? " " : "") + w, attributes: [.font: btbFont(88), .foregroundColor: isHot ? brandRed : ink, .kern: 0.5]))
+            }
+            let p = NSMutableParagraphStyle(); p.alignment = .left; p.lineHeightMultiple = 0.92
+            a.addAttribute(.paragraphStyle, value: p, range: NSRange(location: 0, length: a.length))
+            let card = textCard(a, bg: .clear, padX: 0, padY: 0, corner: 0, maxW: CGFloat(W) - 150)
+            card.frame.origin = CGPoint(x: 75, y: cy - card.bounds.height / 2)
+            addFadeWindow(card, showStart: st, showEnd: en, total: total, fade: 0.2); slideIn(card, at: st, dx: -60); out.append(card)
+            let qa = NSAttributedString(string: "\u{201C}", attributes: [.font: NSFont(name: "Georgia-Bold", size: 300) ?? btbFont(300), .foregroundColor: brandRed])
+            let ql = textCard(qa, bg: .clear, padX: 0, padY: 0, corner: 0, maxW: 400)
+            ql.frame.origin = CGPoint(x: 62, y: card.frame.maxY - ql.bounds.height * 0.42)
+            addFadeWindow(ql, showStart: st, showEnd: en, total: total, fade: 0.15); addPop(ql, at: st, from: 1.4); out.append(ql)
+            let (bi, bs) = bigText("\u{2014} ADAM ROBERTS", size: 34, color: brandRed)
+            let bl = CALayer(); bl.contents = bi; bl.frame = CGRect(x: 75, y: card.frame.minY - bs.height - 30, width: bs.width, height: bs.height)
+            addFadeWindow(bl, showStart: st + 0.3, showEnd: en, total: total, fade: 0.2); out.append(bl)
+        }
     case "news":    // TV-news lower third: red kicker tab on a white headline bar, slides in from the left
         let h = NSAttributedString(string: (g["headline"] as? String ?? "").uppercased(),
             attributes: [.font: btbFont(40), .foregroundColor: NSColor(calibratedWhite: 0.07, alpha: 1), .kern: 0.5])
         let bar = textCard(h, bg: .white, padX: 22, padY: 9, corner: 4, maxW: CGFloat(W) - 80, bar: brandRed)
-        let k = NSAttributedString(string: (g["kicker"] as? String ?? "BREAKING").uppercased(),
+        let k = NSAttributedString(string: (g["kicker"] as? String ?? "").uppercased(),
             attributes: [.font: btbFont(24), .foregroundColor: NSColor.white, .kern: 2.5])
         let tab = textCard(k, bg: brandRed, padX: 14, padY: 4, corner: 3, maxW: CGFloat(W) * 0.6)
-        let box = CALayer(); box.bounds = CGRect(x: 0, y: 0, width: max(bar.bounds.width, tab.bounds.width), height: bar.bounds.height + tab.bounds.height - 4)
-        bar.frame.origin = .zero; tab.frame.origin = CGPoint(x: 0, y: bar.bounds.height - 4)
-        box.addSublayer(bar); box.addSublayer(tab)
+        let hasTab = k.length > 0                // no kicker word: just the white bar with its red edge + a red rule on top
+        let box = CALayer(); box.bounds = CGRect(x: 0, y: 0, width: max(bar.bounds.width, hasTab ? tab.bounds.width : 0), height: bar.bounds.height + (hasTab ? tab.bounds.height - 4 : 6))
+        bar.frame.origin = .zero; box.addSublayer(bar)
+        if hasTab { tab.frame.origin = CGPoint(x: 0, y: bar.bounds.height - 4); box.addSublayer(tab) }
+        else { let rule = CALayer(); rule.backgroundColor = brandRed.cgColor; rule.frame = CGRect(x: 0, y: bar.bounds.height, width: bar.bounds.width, height: 6); box.addSublayer(rule) }
         box.shadowColor = NSColor.black.cgColor; box.shadowOpacity = 0.45; box.shadowRadius = 12; box.shadowOffset = CGSize(width: 0, height: -4)
         box.frame.origin = CGPoint(x: 40, y: freeZoneCenterY(box.bounds.height, start: st, end: en) - box.bounds.height / 2)
         addFadeWindow(box, showStart: st, showEnd: en, total: total, fade: 0.2); slideIn(box, at: st, dx: -CGFloat(W)); out.append(box)

@@ -14,7 +14,9 @@ Plans, in priority order (later items never overlap earlier ones):
   3. your library     ~/Projects/Reels/_library files whose name (or library.json keys) is said -> B-roll
   4. stock B-roll      a registry place/thing with a "stock" query -> Pixabay video (split) or photo (full)
   5. news bars       strongest sentences (STRONG words, numbers) -> red/white TV lower third, <= 1 per 40s
-  6. emoji pops        registry/emoji.json words, first use each, spaced out
+  6. quote card      best strong phrase not used by a news bar -> cream card, Adam in bubble (1 per video)
+  7. stat card       most-repeated number + unit ("24 hours") -> huge red number (1 per video)
+  8. emoji pops        registry/emoji.json words, first use each, spaced out
 Writes beats.json (source-time beats for editplan.py) and plan.json (every candidate, with id/why/on —
 the dashboard shows it and writes off.json to switch items off). Prints UNKNOWN NAMES for the registry.
 """
@@ -190,15 +192,39 @@ def main():
         if len(hw) < 4: continue
         sc = 2 * sum(w in NEWS_STRONG for w in hw) + sum(w in names for w in hw) + 2 * sum(bool(re.fullmatch(r"(19|20)\d\d", w)) for w in hw) \
              + sum(w in NEWS_TURN for w in hw)
-        scored.append((sc, words[ix[0]]["start"], hl))
+        scored.append((sc, words[ix[0]]["start"], hl, " ".join(words[i]["word"].strip() for i in ix)))
     span = sum(hi - lo for lo, hi in ranges); room = max(1, int(span // 40)); placed = []
-    for sc, s, hl in sorted(scored, key=lambda x: -x[0]):
+    for sc, s, hl, _ in sorted(scored, key=lambda x: -x[0]):
         if sc < 4 or len(placed) >= room or any(abs(s - p) < 30 for p in placed): continue
         n0 = len([x for x in plan if x["on"]])
-        add({"id": f"news:{s:.0f}", "type": "news", "headline": hl, "kicker": "BREAKING", "why": f"strong line ({sc}): {hl}"}, s, min(s + 4.5, end_of(s)))
+        add({"id": f"news:{s:.0f}", "type": "news", "headline": hl, "kicker": "", "why": f"strong line ({sc}): {hl}"}, s, min(s + 4.5, end_of(s)))
         if len([x for x in plan if x["on"]]) > n0: placed.append(s)
 
-    # 6. emoji: first use of each, at least 5s apart from each other
+    # 6. quote card: the best strong phrase the news bars didn't use (one per video) -> cream card, Adam in the bubble
+    card = lambda extra, s, e: add({"type": "broll", "color": "#F7F1E6", "bubble": "br", "kb": "none", "nocaps": True, **extra}, s, e)
+    for sc, s, hl, raw in sorted(scored, key=lambda x: -x[0]):
+        if sc < 4 or any(abs(s - p) < 20 for p in placed): continue
+        qt = headline(raw, 12); qw = qt.split()
+        if len(qw) < 4: continue
+        hot = next((w for w in qw if norm(w) in NEWS_STRONG), max(qw, key=len))
+        n0 = len([x for x in plan if x["on"]])
+        card({"id": f"quote:{s:.0f}", "quote": {"text": qt, "hot": norm(hot)}, "why": f"quote card ({sc}): {qt}"}, s, min(s + 4.5, end_of(s)))
+        if len([x for x in plan if x["on"]]) > n0: break
+
+    # 7. stat card: the number + unit said most often ("24 hours", "two hours") -> huge red number (one per video)
+    stats = {}
+    for i in range(len(toks) - 1):
+        n = NUMWORDS.get(toks[i], toks[i] if toks[i].isdigit() and len(toks[i]) < 4 else None)
+        if n and toks[i + 1] in UNITS: stats.setdefault((n, toks[i + 1]), []).append(words[i]["start"])
+    for (n, unit), ts in sorted(stats.items(), key=lambda x: -len(x[1])):
+        n0 = len([x for x in plan if x["on"]])
+        for s in ts:
+            card({"id": f"stat:{n} {unit}", "quote": {"num": n, "label": unit}, "why": f"stat card: {n} {unit} (said {len(ts)}x)"}, s, min(s + 3.0, end_of(s)))
+            if len([x for x in plan if x["on"]]) > n0: break
+            plan.pop()                                  # that moment was busy: try the next mention
+        if len([x for x in plan if x["on"]]) > n0: break
+
+    # 8. emoji: first use of each, at least 5s apart from each other
     used, last = set(), -99.0
     for i, tk in enumerate(toks):
         two = tk + " " + toks[i + 1] if i + 1 < len(toks) else ""
@@ -224,6 +250,9 @@ def main():
 
 NEWS_STRONG = {"miracle", "life", "free", "freedom", "released", "love", "loved", "never", "first", "home", "prison", "parole",
                "amazing", "attica", "years", "decades", "hope", "sun", "died", "dead", "board", "denied", "granted"}
+NUMWORDS = {w: str(i) for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
+NUMWORDS.update({"thirty": "30", "forty": "40", "fifty": "50", "hundred": "100", "thousand": "1,000"})
+UNITS = {"hours", "years", "days", "months", "weeks", "minutes", "times", "percent", "dollars", "people", "books", "pages"}
 NEWS_TURN = {"didn't", "never", "finally", "won't", "can't", "since", "still", "first", "last"}
 LEAD = r"^((from|inside|that|then|which|who|and|so|but|because|where|when)\s+)+"
 TRAIL = r"(\s+(and|so|but|that|the|a|to|of|with|they're|he's|she's|it's|i'm|was|is|in|on|my|his|her))+$"

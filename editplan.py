@@ -13,6 +13,7 @@ beats.json = list of beats. Every beat names WHEN with phrases from the transcri
   "pad":  [0.1, 0.3]            -> seconds to extend before/after
 Types (all other keys pass straight through to stagereel):
   {"type":"broll", "image": "x.jpg" | "color": "#111111", "bubble":"br|bl|none", "label":"FILE PHOTO", "kb":"in|out", "nocaps":false}
+  {"type":"broll", "color":"#F7F1E6", "nocaps":true, "quote":{"text":"...", "hot":"word"} | {"num":"24", "label":"hours"}}  quote/stat card
   {"type":"punch", "zoom":1.5, "focus":[0.55,0.4]}
   {"type":"counter", "n0":1, "n1":118, "prefix":"DAY ", "label":"THE DA'S CLOCK", "count_to":"took a deal"}
   {"type":"slam", "items":[{"text":"TWO HOURS","at":"two hours"}, ...]}
@@ -87,7 +88,9 @@ def main():
             for it in b["items"]: it["start"] = round(find(it.pop("at"), occ)[0], 3)
         if b.pop("nocaps", t in ("counter", "slam")): edit["nocaps"].append([b["start"], b["end"]])
         if t == "punch": edit["punch"].append(b)
-        elif t == "broll": edit["broll"].append(b)
+        elif t == "broll":
+            q = b.pop("quote", None); edit["broll"].append(b)
+            if q: edit["graphics"].append({"type": "quote", "start": b["start"], "end": b["end"], **q})
         else: b["type"] = t; edit["graphics"].append(b)
     json.dump(edit, open(a.out, "w"), indent=1)
     print(f"[editplan] {len(edit['punch'])} punches, {len(edit['broll'])} b-roll, {len(edit['graphics'])} graphics -> {a.out}")

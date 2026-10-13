@@ -43,10 +43,15 @@ in|out|left|right|up|down|none). Video B-roll can be `"layout": "pip"`: the clip
 whole frame slides into a cream-framed box bottom-right (34% size, above the captions), then grows back.
 Library clips default to PiP; Pixabay clips stay split screen. Next: news-style lower thirds, quote/stat cards.
 
-**News bars (Oct 12 2026).** Red-and-white TV lower third ("BREAKING" tab on a white headline bar), only on
+**News bars (Oct 12 2026).** Red-and-white TV lower third (white headline bar, red edge and red rule; optional `kicker` word adds a red tab), only on
 the strongest lines: autoplan scores comma-sized phrases (strong words like parole/Attica/never, registry
 names, years, "didn't/finally/since"), needs a score of 4+, max one per 40s, 30s apart. The headline is the
 phrase with filler and dangling words trimmed, 8 words max. Switch any one off in the dashboard plan list.
+
+**Quote + stat cards (Oct 12 2026).** Quote card: cream full screen, the line in big black type with its
+strongest word in red, a red serif quote mark, "— ADAM ROBERTS", Adam in the corner bubble; the best strong
+phrase the news bars didn't use, one per video. Stat card: the number + unit said most often ("24 HOURS",
+"two hours" -> 2 HOURS) as a huge red number. Captions hide while a card is up (the card shows the words).
 
 ## Pieces
 
