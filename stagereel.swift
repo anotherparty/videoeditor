@@ -936,6 +936,15 @@ func compose() {
         inst.timeRange = CMTimeRange(start: .zero, duration: total)
         let li = AVMutableVideoCompositionLayerInstruction(assetTrack: vTrack)
         var vt = cTransform
+        // small sources (a 576x1024 export) fill the 1080x1920 frame instead of sitting in a corner (k = 1 for 1080p phone video)
+        // (some exports rotate with tx = 1080 not 576, leaving the picture at x 504-1080: move it to the origin first)
+        let cBox = CGRect(origin: .zero, size: try! await cVid.load(.naturalSize)).applying(cTransform), cw = cBox.width, ch = cBox.height
+        let fk = max(CGFloat(W) / cw, CGFloat(H) / ch)
+        if abs(fk - 1) > 0.001 {
+            vt = vt.concatenating(CGAffineTransform(translationX: -cBox.minX, y: -cBox.minY))
+                   .concatenating(CGAffineTransform(scaleX: fk, y: fk))
+                   .concatenating(CGAffineTransform(translationX: (CGFloat(W) - cw * fk) / 2, y: (CGFloat(H) - ch * fk) / 2))
+        }
         if ZOOM > 1.001 {
             let px = CGFloat(W) * FOCUS.0, py = CGFloat(H) * FOCUS.1
             vt = vt.concatenating(CGAffineTransform(translationX: -px, y: -py))
@@ -943,6 +952,7 @@ func compose() {
                    .concatenating(CGAffineTransform(translationX: px, y: py))
         }
         li.setTransform(vt, at: .zero)
+        if HAS_ENDCARD && abs(fk - 1) > 0.001 { li.setTransform(.identity, at: contentDur) }   // the end card is already 1080x1920
         // jump-zoom punches: extra zoom about the punch focus, on top of the base framing
         for p in PUNCHES.sorted(by: { $0.start < $1.start }) {
             let px = CGFloat(W) * p.focus.0, py = CGFloat(H) * p.focus.1
@@ -995,13 +1005,16 @@ func compose() {
         }
         // PiP: the clip fills the frame on a track UNDER Adam; Adam's video shrinks into a box bottom-right, then grows back
         let pbs = BROLLS.filter { $0.video != nil && $0.layout == "pip" }
-        if !pbs.isEmpty, let pTrack = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
-            let lp = AVMutableVideoCompositionLayerInstruction(assetTrack: pTrack)
-            lp.setOpacity(0, at: .zero)
+        // clips alternate between two tracks: one track switching across 3+ phone HEVC sources fails to compose (-11841, Oct 12)
+        let pTracks = pbs.isEmpty ? [] : (0..<min(2, pbs.count)).compactMap { _ in comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) }
+        if !pTracks.isEmpty {
+            let lps = pTracks.map { AVMutableVideoCompositionLayerInstruction(assetTrack: $0) }
+            for lp in lps { lp.setOpacity(0, at: .zero) }
             let pw = CGFloat(W) * PIP_K, ph = CGFloat(H) * PIP_K, ramp = 0.25
             let small = vt.concatenating(CGAffineTransform(scaleX: PIP_K, y: PIP_K))
                           .concatenating(CGAffineTransform(translationX: CGFloat(W) - 26 - pw, y: CGFloat(H) - BUBBLE_BOTTOM - ph))
-            for b in pbs {
+            for (n, b) in pbs.sorted(by: { $0.start < $1.start }).enumerated() {
+                let pTrack = pTracks[n % pTracks.count], lp = lps[n % lps.count]
                 let a = AVURLAsset(url: URL(fileURLWithPath: b.video!))
                 guard let t = try? await a.loadTracks(withMediaType: .video).first,
                       let nat = try? await t.load(.naturalSize), let pt = try? await t.load(.preferredTransform),
@@ -1023,7 +1036,7 @@ func compose() {
                 li.setTransform(vt, at: tm(e0 + ramp))
                 PIP_WINDOWS.append((b.start, b.start + len))
             }
-            layerInsts.append(lp)
+            layerInsts.append(contentsOf: lps)
         }
         inst.layerInstructions = layerInsts; vc.instructions = [inst]
 

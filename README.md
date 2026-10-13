@@ -121,6 +121,24 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   the same name (it becomes NAME-1.jpg; the identical file dropped again is reused, no duplicate). The live dashboard was
   restarted after the last edit and re-tested on it: the 6-line title card stays a card, a 2nd photo named IMG_6400.JPG
   lands as IMG_6400-1.JPG. _library/IMG_3699.HEIC (copied in before this) converted to IMG_3699.jpg.
+- 🖼 Claude places every B-roll file (Oct 12 2026): any file in source/broll/ that no spoken name matched (camera names
+  like IMG_6400.JPG) gets a moment chosen by Claude. autoplan.py makes small jpgs (videos: one frame) in
+  work/auto/broll_thumbs/, then ONE `claude -p` call (Read tool allowed) with the transcript lines + times; Claude says what
+  each picture shows and its best moments (up to 3). Cached in work/broll_auto.json by file name + mtime (no re-asking on
+  re-render; a changed file is asked again). The moment snaps to the matching word in that line ("tree") and slides to
+  the nearest free spot (30 s later / 10 s earlier, keeping 1.5 s of Adam between pictures). It runs after news bars /
+  quote / stat cards (those come from his exact words); a name-matched library file keeps its earlier priority. No
+  Claude (REELSTUDIO_NO_CLAUDE=1, signed out, timeout) or no fitting moment -> spread evenly into the gaps left, never two
+  within 6 s, never in the first 3 s. All ON, photos Ken Burns, clips picture-in-picture; plan "why" = what Claude saw +
+  the line. Dashboard: own colour, "🖼 file" in the plan list with the usual off switch. In a reel, only pictures whose
+  moments fall inside its window appear.
+  Renderer fixes found in the test: (1) 3+ phone HEVC clips on one PiP track failed to compose (-11841); clips now
+  alternate between two tracks. (2) A small source (one-year's 576x1024 video, rotated with tx=1080) sat in a corner
+  of the frame; stagereel now scales any source to fill 1080x1920 (k = 1 for normal phone video, so no change there).
+  Tested on zz-autobroll (one-year video + its 17 B-roll files): Claude placed 17 of 17 in 46 s, the full render was
+  checked frame by frame at every placement (tree photos on "tree... right outside", sunset sky on "I watched the sun go
+  down", paintings and marker clips on "I painted for people"), Adam's face in the bubble/PiP box, never covered;
+  loudness peak -0.9 / RMS -17.4 dBFS. Switching one off on the dashboard dropped it on re-plan; the others stayed.
 
 ## Pieces
 

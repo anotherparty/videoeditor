@@ -18,6 +18,8 @@ Plans, in priority order (later items never overlap earlier ones):
   5. news bars       strongest sentences (STRONG words, numbers) -> red/white TV lower third, <= 1 per 40s
   6. quote card      best strong phrase not used by a news bar -> cream card, Adam in bubble (1 per video)
   7. stat card       most-repeated number + unit ("24 hours") -> huge red number (1 per video)
+  7a. Claude's B-roll every project B-roll file still unplaced: Claude looks at it and picks the moment (cached in
+                        work/broll_auto.json); no Claude -> spread evenly into free gaps (6 s apart, never the first 3 s)
   8. emoji pops        registry/emoji.json words, first use each, spaced out
 Writes beats.json (source-time beats for editplan.py) and plan.json (every candidate, with id/why/on —
 the dashboard shows it and writes off.json to switch items off). Prints UNKNOWN NAMES for the registry.
@@ -251,6 +253,48 @@ def main():
             plan.pop()                                  # that moment was busy: try the next mention
         if len([x for x in plan if x["on"]]) > n0: break
 
+    # 7a. every project B-roll file still unplaced (camera names like IMG_6400.JPG never match) gets a moment Claude picks
+    #     from the picture itself; no answer / no Claude -> spread evenly into free gaps. You only switch them off.
+    #     Runs after the text graphics: those come from his exact words, Claude's picks are a judgement call.
+    rest = []                                                           # unplaced files for the even spread (after the cards)
+    if a.pool and Path(a.pool).is_dir():
+        placed_paths = {x.get("image") or x.get("video") for x in plan if x["on"]}
+        left = [f for f in sorted(Path(a.pool).iterdir()) if f.suffix.lower() in VIDS | {".jpg", ".jpeg", ".png"}
+                and str(f) not in placed_paths and f"lib:{f.name}" not in off]
+        segs = [s for s in json.load(open(a.transcript))["segments"] if s.get("text", "").strip()]
+        picks = broll_auto(left, segs, work)
+        t0 = min(lo for lo, hi in ranges) + 3.0                     # never over the hook (first 3 s)
+        ok_at = lambda s: inside(s) and inside(s + 3.0) and s >= t0 and free(s, min(s + 3.8, end_of(s)), 1.5)   # 1.5 s of Adam between pictures, no flicker
+        def auto_item(f, s, why):
+            item = {"id": f"auto:{f.name}", "type": "broll", "why": why}
+            if f.suffix.lower() in VIDS: item.update(video=str(f), layout="pip")
+            else: item.update(image=str(f), kb=next(KB))
+            add(item, s, min(s + 3.8, end_of(s)))
+        for f in left:
+            p_ = picks.get(f.name) or {}
+            if not p_.get("moments"): rest.append(f); continue          # no Claude, or nothing he says fits: spread it
+            seen = {norm(w) for w in re.split(r"\W+", p_.get("saw", "")) if len(w) >= 4}
+            def snap(m):                                                # line start -> the word that matches the picture
+                sg = next((x for x in segs if abs(x["start"] - m) < 0.6), None)
+                return next((w["start"] for w in (sg or {}).get("words", []) if norm(w["word"]).rstrip("s") in {x.rstrip("s") for x in seen}), m)
+            ms = [snap(m) for m in p_["moments"] if inside(m) or inside(snap(m))]
+            if not ms: continue                                         # its moments are outside this video's window
+            nudge = sorted((k * 0.5 for k in range(-20, 61)), key=lambda d: d if d >= 0 else -3 * d)  # nearest free spot: up to 30 s later / 10 s earlier
+            s = next((m + d for m in ms for d in nudge if ok_at(m + d)), None)
+            if s is None: rest.append(f); continue                       # its moments are full: the even spread keeps it on
+            line = ([x["text"].strip() for x in segs if x["start"] <= s + 1.0] or [""])[-1]
+            auto_item(f, s, f"Claude saw {p_.get('saw', 'the picture')} -> '{line[:70]}'")
+
+    # 7b. B-roll Claude couldn't place: spread evenly into the gaps left, never two within 6 s, never the first 3 s
+    if rest:
+        lo_, hi_ = t0, reel_end - 4.0
+        for k, f in enumerate(rest):
+            aim = lo_ + (hi_ - lo_) * (k + 0.5) / len(rest)
+            near = lambda s: any(abs(s - x["src"][0]) < 6.0 for x in plan if x["on"] and str(x["id"]).startswith("auto:"))
+            cand = sorted((aim + d * 0.5 for d in range(-int(hi_ - lo_) * 2, int(hi_ - lo_) * 2 + 1)), key=lambda s: abs(s - aim))
+            s = next((c for c in cand if lo_ <= c <= hi_ and ok_at(c) and not near(c)), None)
+            if s is not None: auto_item(f, s, f"spread into a free gap ({'Claude unavailable' if not picks.get(f.name) else 'Claude saw ' + picks[f.name].get('saw', '') + (', its moments were full' if picks[f.name].get('moments') else ', no matching moment')})")
+
     # 8. emoji: first use of each, at least 5s apart from each other
     used, last = set(), -99.0
     for i, tk in enumerate(toks):
@@ -327,6 +371,49 @@ def polish(cands, words, work: Path):
         except Exception as ex:
             print(f"[autoplan] Claude polish skipped ({type(ex).__name__}); using keyword wording")
     return cache
+
+BROLL_PROMPT = """You are placing B-roll in a talking-head video by Adam Roberts (formerly incarcerated writer and artist).
+Below are his spoken lines with start times in seconds, then numbered picture files from his own phone. Use the Read tool
+to look at EVERY picture. For each one, pick the moments (start seconds of the lines above) where the picture best
+illustrates what he is saying right then: best first, up to 3, different lines. Only literal matches (a tree when he
+talks about the tree, a painting when he talks about painting); if nothing he says fits, give an empty list.
+"saw" = what is in the picture, 3 to 8 plain words. Reply with ONLY JSON:
+{"1": {"saw": "...", "moments": [12.3, 45.0]}, "2": {...}}
+"""
+
+def broll_auto(files, segs, work: Path):
+    """{file name: {"saw", "moments": [source seconds]}} for project B-roll Claude has looked at. One CLI call for the
+    files not yet asked (videos: one frame); cached in work/broll_auto.json by name + mtime so renders don't re-ask.
+    Claude off / failing -> {} for those files (the caller spreads them evenly)."""
+    cache_p = work.parent / "broll_auto.json"; cache = load(cache_p, {})
+    key = lambda f: f"{f.name}|{int(f.stat().st_mtime)}"
+    todo = [f for f in files if key(f) not in cache]
+    if todo and CLAUDE.exists() and os.environ.get("REELSTUDIO_NO_CLAUDE") != "1":
+        th = work / "broll_thumbs"; th.mkdir(parents=True, exist_ok=True); pics = []
+        for f in todo:                                     # small jpgs: quick for Claude to Read
+            t = th / f"{f.name}.{int(f.stat().st_mtime)}.jpg"        # a replaced file gets a fresh thumb
+            if not t.exists():
+                if f.suffix.lower() in VIDS:
+                    subprocess.run(["swift", str(HERE / "grabframes.swift"), str(f), str(th / "_g"), "1.0"], capture_output=True)
+                    if (th / "_g" / "frame_0001.jpg").exists(): os.replace(th / "_g" / "frame_0001.jpg", t)
+                else: subprocess.run(["sips", "-s", "format", "jpeg", "-Z", "900", str(f), "--out", str(t)], capture_output=True)
+            if t.exists(): pics.append((f, t))
+        lines = "\n".join(f"[{s['start']:.1f}] {s['text'].strip()}" for s in segs)
+        body = "\n".join(f"{n}. {t} ({'video clip, one frame' if f.suffix.lower() in VIDS else 'photo'})" for n, (f, t) in enumerate(pics, 1))
+        try:
+            r = subprocess.run([str(CLAUDE), "-p", f"{BROLL_PROMPT}\nLINES:\n{lines}\n\nPICTURES:\n{body}", "--allowedTools", "Read",
+                                "--output-format", "text"], capture_output=True, text=True, timeout=600, stdin=subprocess.DEVNULL, cwd=str(th))
+            m = re.search(r"\{.*\}", r.stdout, re.S); got = json.loads(m.group(0)) if m else {}
+            for n, (f, t) in enumerate(pics, 1):
+                g = got.get(str(n))
+                if isinstance(g, dict):
+                    cache[key(f)] = {"saw": str(g.get("saw", "")).strip()[:80],
+                                     "moments": [float(x) for x in g.get("moments", []) if isinstance(x, (int, float))][:3]}
+            json.dump(cache, open(cache_p, "w"), indent=1, ensure_ascii=False)
+            print(f"[autoplan] Claude placed {sum(key(f) in cache for f, _ in pics)} of {len(pics)} B-roll files")
+        except Exception as ex:
+            print(f"[autoplan] Claude B-roll pass skipped ({type(ex).__name__}); spreading evenly")
+    return {f.name: cache[key(f)] for f in files if key(f) in cache}
 
 def fetch(url, out=None):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh) stage-reel/1.0"})
