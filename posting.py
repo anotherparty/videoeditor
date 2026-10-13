@@ -34,10 +34,11 @@ def upload_copy(p: Path, n: str) -> Path:
     if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime and dst.stat().st_size <= CAP: return dst
     dst.parent.mkdir(parents=True, exist_ok=True)
     br = int(src.stat().st_size * 8 / max(1.0, duration(src)) * CAP / src.stat().st_size * 0.92)
-    for _ in range(3):                             # shrink the bitrate until it fits
-        subprocess.run(["swift", str(HERE / "compress.swift"), str(src), str(dst), str(br)], capture_output=True, text=True)
-        if dst.exists() and dst.stat().st_size <= CAP: return dst
-        br = int(br * 0.8)
+    for w in (None, 720, 540):                     # full res first; long videos need a smaller frame (encoder floor ~480 kbps at 720)
+        for _ in range(3):                         # shrink the bitrate until it fits
+            subprocess.run(["swift", str(HERE / "compress.swift"), str(src), str(dst), str(br), *([str(w)] if w else [])], capture_output=True, text=True)
+            if dst.exists() and dst.stat().st_size <= CAP: return dst
+            br = int(br * 0.8)
     raise ValueError("couldn't make an upload copy under 10MB")
 
 def duration(f: Path) -> float:

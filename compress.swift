@@ -13,6 +13,9 @@ let OW = CommandLine.arguments.count > 4 ? Int(CommandLine.arguments[4])! : Int(
 let OH = Int((CGFloat(OW) * sz.height / sz.width / 2).rounded()) * 2
 
 let reader = try! AVAssetReader(asset: asset)
+// optional 5th arg: start second; drops everything before it (e.g. to get a 3:02 video under Instagram's 3:00 limit)
+let START = CommandLine.arguments.count > 5 ? CMTime(seconds: Double(CommandLine.arguments[5])!, preferredTimescale: 600) : .zero
+if START > .zero { reader.timeRange = CMTimeRange(start: START, end: asset.duration) }
 let vOut = AVAssetReaderTrackOutput(track: vTrack,
   outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange])
 reader.add(vOut)
@@ -43,7 +46,7 @@ if aOut != nil {
 
 guard reader.startReading() else { die("startReading: \(String(describing: reader.error))") }
 guard writer.startWriting() else { die("startWriting: \(String(describing: writer.error))") }
-writer.startSession(atSourceTime: .zero)
+writer.startSession(atSourceTime: START)
 
 let grp = DispatchGroup()
 grp.enter()
