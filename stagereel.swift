@@ -96,7 +96,7 @@ if let insPath = arg("--insets"), let data = FileManager.default.contents(atPath
 // edit plan (OUTPUT time, content timeline) — see editplan.py
 struct Punch { let start: Double; let end: Double; let zoom: CGFloat; let focus: (CGFloat, CGFloat) }
 struct Broll { let image: String?; let color: String?; let start: Double; let end: Double
-               let bubble: String; let label: String?; let kb: String
+               var bubble: String; let label: String?; let kb: String
                var marks: [[String: Any]] = []    // highlighter patches from brollcard.swift, each with "start"
                var layout: String = "full"        // full (cutaway + bubble) | split (image top half, Adam bottom half) | pip (video only)
                var video: String? = nil }         // video clip: split, or pip = clip full screen + Adam shrunk into a framed corner box
@@ -615,12 +615,50 @@ func hexColor(_ h: String) -> NSColor {
     var v: UInt64 = 0; Scanner(string: h.replacingOccurrences(of: "#", with: "")).scanHexInt64(&v)
     return NSColor(calibratedRed: CGFloat((v >> 16) & 255)/255, green: CGFloat((v >> 8) & 255)/255, blue: CGFloat(v & 255)/255, alpha: 1)
 }
+// phone photos with an HDR gain map load as 10-bit extended-range images that come out washed-out grey in the video
+// (one-year's IMG_6400 selfie): redraw every B-roll still as plain 8-bit sRGB, long side <= 2400 px (plenty for Ken Burns)
+func sdrImage(_ cg: CGImage) -> CGImage {
+    let k = min(1, 2400 / CGFloat(max(cg.width, cg.height))), w = Int(CGFloat(cg.width) * k), h = Int(CGFloat(cg.height) * k)
+    guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return cg }
+    ctx.interpolationQuality = .high; ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+    return ctx.makeImage() ?? cg
+}
+func loadStill(_ path: String) -> CGImage? {
+    guard let im = NSImage(contentsOfFile: path), let cg = im.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+    return sdrImage(cg)
+}
+// Adam's bubble never sits on a face IN the photo (his own selfie): Vision finds the faces, mapped through the
+// aspect-fill crop + worst case of the 1.14 Ken Burns zoom/pan, grown for hair/chin; the bubble takes the clearest corner
+func bubbleCorner(_ b: Broll) -> String {
+    guard b.bubble != "none", let p = b.image, let cg = loadStill(p) else { return b.bubble }
+    let req = VNDetectFaceRectanglesRequest(), hum = VNDetectHumanRectanglesRequest(); try? VNImageRequestHandler(cgImage: cg).perform([req, hum])
+    // faces, plus the head end of each person Vision sees (a face turned away isn't a face to Vision: IMG_3699, painting)
+    let heads = (hum.results ?? []).map { r -> CGRect in let h = r.boundingBox; return CGRect(x: h.minX, y: h.maxY - h.height * 0.3, width: h.width, height: h.height * 0.3) }   // top 30%, grown below for hair room
+    let faces = (req.results ?? []).map { $0.boundingBox } + heads; if faces.isEmpty { return b.bubble }
+    let iw = CGFloat(cg.width), ih = CGFloat(cg.height), s = max(CGFloat(W) / iw, CGFloat(H) / ih)
+    let ox = (CGFloat(W) - iw * s) / 2, oy = (CGFloat(H) - ih * s) / 2, d = CGFloat(W) * 0.06 * 1.14, c = CGPoint(x: CGFloat(W) / 2, y: CGFloat(H) / 2)
+    let zones = faces.map { f -> CGRect in       // Vision and CA both measure y from the bottom
+        let r0 = CGRect(x: ox + f.minX * iw * s, y: oy + f.minY * ih * s, width: f.width * iw * s, height: f.height * ih * s)
+        let r = CGRect(x: r0.minX - r0.width * 0.25, y: r0.minY - r0.height * CHIN_ALLOW, width: r0.width * 1.5, height: r0.height * (1 + CHIN_ALLOW + HAIR_ALLOW))
+        let z = CGRect(x: c.x + (r.minX - c.x) * 1.14, y: c.y + (r.minY - c.y) * 1.14, width: r.width * 1.14, height: r.height * 1.14)
+        return r.union(z).insetBy(dx: -d, dy: -d)
+    }
+    let D = BUBBLE_D
+    func rect(_ k: String) -> CGRect { CGRect(x: (k.hasSuffix("l") ? 26 + D/2 : CGFloat(W) - 26 - D/2) - D/2,
+                                              y: (k.hasPrefix("t") ? CGFloat(H) * 0.62 : BUBBLE_BOTTOM + D/2) - D/2, width: D, height: D) }
+    func hit(_ k: String) -> CGFloat { zones.map { let i = rect(k).intersection($0); return i.isNull ? 0 : i.width * i.height }.reduce(0, +) }
+    let v = b.bubble.hasPrefix("t") ? "t" : "b", h = b.bubble.hasSuffix("l") ? "l" : "r", v2 = v == "t" ? "b" : "t", h2 = h == "l" ? "r" : "l"
+    let best = [v + h, v + h2, v2 + h, v2 + h2].min { hit($0) < hit($1) }!     // first of the least-covered corners
+    if best != b.bubble { FileHandle.standardError.write("NOTE: bubble moved \(b.bubble) -> \(best): a face in \((p as NSString).lastPathComponent)\n".data(using: .utf8)!) }
+    return best
+}
 func makeBroll(_ b: Broll, total: Double) -> CALayer {
     let box = CALayer(); box.masksToBounds = true
     box.frame = b.layout == "split" ? CGRect(x: 0, y: CGFloat(H) / 2, width: CGFloat(W), height: CGFloat(H) / 2)
                                     : CGRect(x: 0, y: 0, width: W, height: H)
     if let c = b.color { box.backgroundColor = hexColor(c).cgColor }
-    if let path = b.image, let im = NSImage(contentsOfFile: path), let cg = im.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+    if let path = b.image, let cg = loadStill(path) {
         let pic = CALayer(); pic.frame = box.bounds; pic.contents = cg; pic.contentsGravity = .resizeAspectFill
         let pan = ["left", "right", "up", "down"].contains(b.kb), d = box.bounds.width * 0.06   // pans: zoomed 1.14, drift across
         let kb = CABasicAnimation(keyPath: pan ? "position" : "transform.scale")
@@ -1052,7 +1090,8 @@ func compose() {
         // B-roll cutaways, Adam's bubble over them, then animated graphics
         for b in BROLLS where b.video == nil { parent.addSublayer(makeBroll(b, total: totalS)) }
         for b in BROLLS where b.bubble != "none" && b.layout != "split" && b.video == nil {
-            let (wrap, vid) = makeBubble(b, face: face, total: totalS)
+            var bb = b; bb.bubble = bubbleCorner(b)
+            let (wrap, vid) = makeBubble(bb, face: face, total: totalS)
             parent.addSublayer(wrap); videoLayers.append(vid)
         }
         for (s, e) in PIP_WINDOWS {          // cream frame + shadow around Adam's PiP box (appears once he's shrunk)

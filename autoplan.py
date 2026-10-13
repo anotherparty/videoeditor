@@ -246,6 +246,7 @@ def main():
     stats = {}
     for i in range(len(toks) - 1):
         n = NUMWORDS.get(toks[i], toks[i] if toks[i].isdigit() and len(toks[i]) < 4 else None)
+        if toks[i] in HOMOPHONES and toks[i + 1] in COUNTS: continue   # "painted four people" is usually "painted for people"
         if n and toks[i + 1] in UNITS: stats.setdefault((n, toks[i + 1]), []).append(words[i]["start"])
     for (n, unit), ts in sorted(stats.items(), key=lambda x: -len(x[1])):
         n0 = len([x for x in plan if x["on"]])
@@ -306,7 +307,7 @@ def main():
     used, last = set(), -99.0
     for i, tk in enumerate(toks):
         two = tk + " " + toks[i + 1] if i + 1 < len(toks) else ""
-        e_ = emoji.get(two) or emoji.get(tk)
+        e_ = emoji[two] if two in emoji else emoji.get(tk)      # a two-word key set to "" blocks it ("heart attack" is no ❤️)
         if not e_ or e_ in used: continue
         s = words[i]["start"]
         if s - last < 5.0: continue
@@ -331,6 +332,7 @@ NEWS_STRONG = {"miracle", "life", "free", "freedom", "released", "love", "loved"
 NUMWORDS = {w: str(i) for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
 NUMWORDS.update({"thirty": "30", "forty": "40", "fifty": "50", "hundred": "100", "thousand": "1,000"})
 UNITS = {"hours", "years", "days", "months", "weeks", "minutes", "times", "percent", "dollars", "people", "books", "pages"}
+HOMOPHONES, COUNTS = {"two", "four", "eight"}, {"people", "books", "pages"}   # to/for/ate + a plain noun: not a stat
 NEWS_TURN = {"didn't", "never", "finally", "won't", "can't", "since", "still", "first", "last"}
 LEAD = r"^((from|inside|that|then|which|who|and|so|but|because|where|when)\s+)+"
 TRAIL = r"(\s+(and|so|but|that|the|a|to|of|with|they're|he's|she's|it's|i'm|was|is|in|on|my|his|her))+$"

@@ -169,6 +169,28 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   pictures 8.1 s apart, no-Claude plan 17/17 on and 6.09 s apart; frames checked at every graphic and every gap;
   loudness -0.9 / -17.4 dBFS. 8 of 17 pictures sit on a line Claude picked; 9 are spread (four sunset shots all wanted
   the one "sun go down" line), so those are the ones to switch off if they don't fit.
+- 🎞 Claude picks the reels (Oct 13 2026): reelpick.py hands Claude the numbered sentences (with times) and asks for
+  up to 4 stand-alone stories: a start that needs no earlier context, a real ending, natural length (about 15-75 s,
+  never padded to a round number), no overlaps. Its picks are checked (whole sentences, 12-90 s, no overlap) and the
+  keyword scorer is the fallback (no Claude / REELSTUDIO_NO_CLAUDE=1 / nothing usable). The keyword scorer itself now
+  only ends a reel where a sentence ends (one-year's first pick stopped on "after decades," before the Shawshank line)
+  and loses points for starting mid-sentence; a reel with no named person gets its punchiest phrase as the tag instead
+  of its first five words ("And so it's when I"). Reel names come from the tag's last word (reel_living, not reel_ive).
+  Reel windows now keep up to 0.3 s of air past the first/last word (never into a neighbour word); it was 0.05 s,
+  which clamped deadair's pad on the last word. Two plan fixes found in the one-year QA: a homophone number word
+  ("two", "four", "eight") before people/books/pages no longer makes a stat card ("I also painted four people" was
+  "for people": a 4 PEOPLE card), and a two-word emoji key set to "" blocks the one-word emoji ("heart attack" no
+  longer pops a ❤️). Tested on one-year: picks = tree to Shawshank to "a person in this society again" (60 s finished),
+  ankle monitor at Sing Sing (32 s), painting inside to "I watched the sun go down" (51 s), "busy living" (29.5 s); full 3:02.
+  Renderer + Post panel fixes from the same QA: (1) Adam's selfie (IMG_6400) had his bubble right on his face in the
+  photo. stagereel now runs Vision on each B-roll still (faces + the head end of each person, since a head turned away
+  isn't a face), maps them through the aspect-fill crop and the worst Ken Burns zoom/pan, and puts the bubble in the
+  clearest corner (log: "NOTE: bubble moved br -> tl"). (2) iPhone photos with an HDR gain map load as 10-bit
+  images that came out grey and washed in the video; every still is now redrawn as 8-bit sRGB (long side <= 2400 px).
+  (3) Captions were fed every transcript line touching the reel window, so a neighbour sentence leaked in; now only
+  lines whose middle is inside it. (4) Hashtags are cleaned to #word ("#ankle monitor" -> #anklemonitor). (5) Alt
+  text was a guess ("outdoors near Kerber Farms" for a bookshop talk): write_caption now adds "What's on screen", one
+  cached Claude look at a frame of the main video (work/scene.json) plus what Claude saw in each picture the video shows.
 
 ## Pieces
 

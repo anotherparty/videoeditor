@@ -101,7 +101,7 @@ def window_text(p, video):
     """what Adam says in this video (the reel's window, or everything for the full video)"""
     cfg = jload(p / "project.json", {}); w = next((r.get("window", "") for r in cfg.get("reels", []) if r["name"] == video), "")
     lo, hi = (map(float, w.split("-")) if w else (0, 1e9))
-    return " ".join(r["text"] for r in lines(p) if r["end"] >= lo and r["start"] <= hi), lo, hi
+    return " ".join(r["text"] for r in lines(p) if lo <= (r["start"] + r["end"]) / 2 <= hi), lo, hi   # only lines IN the reel, not the neighbour ending at its edge
 
 CLAUDE_STATE = Path.home() / ".config" / "another-party" / "claude_state.json"   # last result of calling Claude
 
@@ -116,10 +116,37 @@ def ask_claude(prompt, timeout=180):
     if state == "needs_login": return "", "Claude needs you to sign in once: open Terminal, run ~/.local/bin/claude and type /login"
     return r.stdout, (None if r.returncode == 0 else out.strip()[-300:])
 
+def on_screen(p, video):
+    """what the viewer actually sees, so alt text isn't a guess: one Claude look at a frame of the main footage (cached in
+    work/scene.json by video + mtime) + what Claude saw in each picture this video shows (from its plan)"""
+    cfg = jload(p / "project.json", {}); src = p / cfg.get("video", "x"); out = []
+    if src.exists():
+        sp = p / "work" / "scene.json"; sc = jload(sp, {}); key = f"{src.name}|{int(src.stat().st_mtime)}"
+        if key not in sc and CLAUDE.exists():
+            fr = p / "work" / "scene"; fr.mkdir(exist_ok=True)
+            subprocess.run(["swift", str(SKILL / "grabframes.swift"), str(src), str(fr), "10"], capture_output=True, timeout=120)
+            if (fr / "frame_0010.jpg").exists():
+                r = subprocess.run([str(CLAUDE), "-p", "Read frame_0010.jpg. In one plain sentence under 25 words, say what is on screen: the setting, "
+                                    "what the man talking is doing and holding. No names, no guesses about the place's name. Reply with only the sentence.",
+                                    "--allowedTools", "Read", "--output-format", "text"], capture_output=True, text=True, timeout=180,
+                                   stdin=subprocess.DEVNULL, cwd=str(fr))
+                if r.returncode == 0 and r.stdout.strip(): sc[key] = r.stdout.strip().splitlines()[-1][:300]; jsave(sp, sc)
+        if sc.get(key): out.append("Main footage: " + sc[key])
+    pics = []
+    for x in jload(p / "work" / f"{video}.plan.json", []):
+        if not x.get("on") or x.get("type") != "broll": continue
+        m = re.search(r"Claude saw (.+?)\s*(?:->|, its|\))", x.get("why", "")); i = str(x.get("id", ""))
+        if m: pics.append(m.group(1).strip())
+        elif i.startswith("archive:"): pics.append(f"archive photo of {i[8:]}")
+    if pics: out.append("Pictures shown over him: " + "; ".join(pics))
+    return "\n".join(out)
+
 def write_caption(p, video):
     """Claude writes the caption from the transcript (claude -p, 3 min max) -> cfg["post"][video]"""
     text, _, _ = window_text(p, video)
-    prompt = CAPTION_PROMPT.read_text() + "\n\n# Reel transcript\n" + text[:6000]
+    seen = on_screen(p, video)
+    prompt = CAPTION_PROMPT.read_text() + "\n\n# Reel transcript\n" + text[:6000] + \
+             (f"\n\n# What's on screen (facts: base the alt text on this, never on guesses)\n{seen}" if seen else "")
     stdout, err = ask_claude(prompt)
     if err: return {"error": err}
     m = re.search(r"\{.*\}", stdout, re.S)
@@ -480,7 +507,7 @@ class H(BaseHTTPRequestHandler):
             if "error" in out: return self.send(200, out)
             cfg = jload(cfgp, {}); post = cfg.setdefault("post", {}).setdefault(data["video"], {})
             post.update(caption=out.get("caption", ""), alt_hook=out.get("alt_hook", ""), alt_text=out.get("alt_text", ""),
-                        flags=out.get("flags", []), tags=" ".join(out.get("hashtags", [])))
+                        flags=out.get("flags", []), tags=" ".join("#" + t for t in (re.sub(r"\W", "", str(h)) for h in out.get("hashtags", [])) if t))   # "#ankle monitor" -> #anklemonitor
             jsave(cfgp, cfg); return self.send(200, {"ok": True})
         if act == "post_save":            # {video, caption?, tags?, alt_text?} -> your edits
             post = cfg.setdefault("post", {}).setdefault(data["video"], {})
