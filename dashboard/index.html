@@ -9,7 +9,7 @@
   --bg:#f7f1e6; --panel:#fffdf8; --ink:#1d1a17; --muted:#6f665c; --line:#e5dccd;
   --red:#b22e26; --mint:#33f2c7; --purple:#8c2ef2; --ok:#1f8a5b; --warn:#b7791f;
   --label:#2f6fdb; --place:#c2410c; --emoji:#a16207; --broll:#7c3aed; --stock:#0f766e;
-  --lib:#be185d; --auto:#9d174d; --hand:#1d1a17; --news:#dc2626; --card:#0e7490; --article:#4d7c0f;
+  --lib:#be185d; --auto:#9d174d; --hand:#1d1a17; --news:#dc2626; --card:#0e7490; --article:#4d7c0f; --year:#4338ca;
   --r:14px; --shadow:0 1px 2px rgba(40,30,20,.06),0 4px 16px rgba(40,30,20,.06);
 }
 *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -195,8 +195,8 @@ h2.sec.collapsed + *{display:none}
 </div>
 <script>
 const COLORS={label:'var(--label)',place:'var(--place)',emoji:'var(--emoji)',broll:'var(--broll)',stock:'var(--stock)',
-  lib:'var(--lib)',auto:'var(--auto)',hand:'var(--hand)',news:'var(--news)',card:'var(--card)',article:'var(--article)'};
-const KINDS={label:'Name label',place:'Place card',emoji:'Emoji',broll:'Screenshot',stock:'Stock footage',lib:'Your library',auto:'Your B-roll, placed by Claude',hand:'Placed by you',news:'News bar',card:'Quote / stat card',article:'Article card'};
+  lib:'var(--lib)',auto:'var(--auto)',hand:'var(--hand)',news:'var(--news)',card:'var(--card)',article:'var(--article)',year:'var(--year)'};
+const KINDS={label:'Name label',place:'Place card',emoji:'Emoji',broll:'Screenshot',stock:'Stock footage',lib:'Your library',auto:'Your B-roll, placed by Claude',hand:'Placed by you',news:'News bar',card:'Quote / stat card',article:'Article card',year:'Year strip'};
 const $=s=>document.querySelector(s);
 let cur=null, data=null, timer=null, editing=false, LASTSIG='', LASTVID=null;
 // spacebar plays / pauses the video you last played (unless you're typing)
@@ -402,6 +402,7 @@ function label(i){
   if(k==='stock')return `🎥 stock: ${String(i.id).slice(6)}${skip}`;
   if(i.type==='label')return `${i.name} · ${i.role}`;
   if(i.type==='place')return `📍 ${i.place} ${i.year||''}`;
+  if(i.type==='year')return `📅 ${i.y0} → ${i.y1}${skip}`;
   if(i.type==='emoji')return `${i.emoji} at ${i.why}`;
   return i.why;
 }

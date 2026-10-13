@@ -128,7 +128,8 @@ class Run:
         jsave(manual, [{**m, "path": str(self.p / m["path"])} for m in self.cfg.get("manual_broll", [])])
         self.sh(["python3", HERE / "autoplan.py", tj, "--cuts", cuts, "--work", self.work / "auto", "--out", self.work / f"{name}.beats.json",
                  "--plan", self.work / f"{name}.plan.json", "--off", self.work / f"{name}.off.json", "--manual", manual, "--moves", self.work / f"{name}.moves.json", "--pool", self.p / "source" / "broll", *(["--shots", *shots] if shots else []),
-                 *(["--avoid", *self.cfg["shot_avoid"]] if self.cfg.get("shot_avoid") else [])])
+                 *(["--avoid", *self.cfg["shot_avoid"]] if self.cfg.get("shot_avoid") else []),
+                 *(["--year", str(2000 + int(m[1]) % 100 if len(m[1]) == 2 else int(m[1]))] if (m := re.search(r"(\d{2}|\d{4})\s*$", self.cfg.get("date", ""))) else [])])   # "now" on the year strip = the project's date
         self.sh(["python3", HERE / "editplan.py", tj, "--cuts", cuts, self.work / f"{name}.beats.json", "--out", self.work / f"{name}.edit.json"])
         if plan_only: return
         self.say("rendering", name)

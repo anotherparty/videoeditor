@@ -17,6 +17,8 @@ Plans, in priority order (later items never overlap earlier ones):
   3. your library     ~/Projects/Reels/_library files whose name (or library.json keys) is said -> B-roll
   3b. archival still  registry place with "archive" -> public-domain Wikimedia photo (after its place card, or instead of stock)
   4. stock B-roll      a registry place/thing with a "stock" query -> Pixabay video (split) or photo (full)
+  4b. year strip      two different years <= 20 s apart, or a year + "now/today" ("since 2010" = to now) -> a ruler
+                        slides from the first to the second, ~3.2 s, top half (1 per video, on)
   5. news bars       strongest sentences (STRONG words, numbers) -> red/white TV lower third, <= 1 per 40s
   6. quote card      best strong phrase not used by a news bar -> cream card, Adam in bubble (1 per video)
   7. stat card       most-repeated number + unit ("24 hours") -> huge red number (1 per video)
@@ -50,6 +52,7 @@ def main():
     ap.add_argument("--moves", help="timeline drags {id: [start, end]} (source time) from the dashboard")
     ap.add_argument("--pool", help="this project's B-roll folder (source/broll): same rules as your library")
     ap.add_argument("--shots", nargs="*", default=[]); ap.add_argument("--no-stock", action="store_true")
+    ap.add_argument("--year", type=int, help="the year 'now' means (the project's date); default this year")
     ap.add_argument("--avoid", nargs="*", default=[], help="text that must never appear on a screenshot card (e.g. a wrong date)")
     a = ap.parse_args()
     work = Path(a.work); work.mkdir(parents=True, exist_ok=True)
@@ -240,6 +243,29 @@ def main():
             add({"id": f"place:{pl['name']}", "type": "place", "place": pl["name"], "year": "",
                  "why": f"mention of {pl['name']}"}, s, min(s + 2.6, end_of(s)))
 
+    # 4b. year strip: two different years said <= 20 s apart, or a year + "now/today" (or "since 2010": to now) -> a ruler
+    #     slides from the first said to the second (one per video, on). Busy at the first word -> slide later, up to 1.5 s
+    #     past the second; nothing free -> listed off (skipped) so you can see it.
+    now_y = a.year or __import__("datetime").date.today().year
+    yrs = []                                         # (time, year, said "since" just before / None = a now-word)
+    for i, tk in enumerate(toks):
+        if re.fullmatch(r"(19[3-9]\d|20[0-4]\d)", tk): yrs.append((words[i]["start"], int(tk), "since" in toks[max(0, i - 4):i]))
+        elif tk in NOW or (i and f"{toks[i - 1]} {tk}" in ("this year", "these days")): yrs.append((words[i]["start"], now_y, None))
+    pairs = [(p, q) for k, p in enumerate(yrs) for q in yrs[k + 1:] if q[0] - p[0] <= 20 and p[1] != q[1]
+             and abs(p[1] - q[1]) <= 100 and not (p[2] is None and q[2] is None)]         # two now-words aren't a pair
+    pairs = sorted(pairs + [(p, (p[0], now_y, None)) for p in yrs if p[2] and p[1] != now_y and abs(p[1] - now_y) <= 100], key=lambda x: (x[0][0], x[1][0]))
+    def o_end(s, d):                                 # source time once d seconds of finished video have played from s
+        o_e = out_t(s) + d
+        return min([lo + (o_e - out_t(lo)) for lo, hi in ranges if out_t(lo) <= o_e <= out_t(lo) + hi - lo] or [reel_end])
+    ystrip = lambda p, q: {"id": f"year:{p[1]}-{q[1]}", "type": "year", "y0": p[1], "y1": q[1],
+                           "why": f"since {p[1]} -> now ({q[1]})" if q[0] == p[0] else f"{p[1]} and {q[1]} said {q[0] - p[0]:.0f} s apart"}
+    ok = lambda c: inside(c) and out_t(o_end(c, 3.2)) - out_t(c) >= 2.5 and free(c, o_end(c, 3.2))
+    for p, q in pairs:
+        s = next((p[0] + k * 0.25 for k in range(int((q[0] + 1.5 - p[0]) / 0.25) + 1) if ok(p[0] + k * 0.25)), None)
+        if s is not None: add(ystrip(p, q), s, o_end(s, 3.2)); break
+    else:
+        if pairs: add(ystrip(*pairs[0]), pairs[0][0][0], o_end(pairs[0][0][0], 3.2))      # all busy: listed off
+
     # 5. news lower thirds: only the strongest phrases (clause-sized, like a headline), at most one per ~40s
     names = {norm(k) for x in people + places for k in x["keys"] for k in k.split()}
     clauses, cur = [], []
@@ -367,6 +393,7 @@ NUMWORDS = {w: str(i) for i, w in enumerate("zero one two three four five six se
 NUMWORDS.update({"thirty": "30", "forty": "40", "fifty": "50", "hundred": "100", "thousand": "1,000"})
 UNITS = {"hours", "years", "days", "months", "weeks", "minutes", "times", "percent", "dollars", "people", "books", "pages"}
 HOMOPHONES, COUNTS = {"two", "four", "eight"}, {"people", "books", "pages"}   # to/for/ate + a plain noun: not a stat
+NOW = {"now", "today", "nowadays"}                        # a year + one of these (<= 20 s) -> year strip to the project's year
 NEWS_TURN = {"didn't", "never", "finally", "won't", "can't", "since", "still", "first", "last"}
 LEAD = r"^((from|inside|that|then|which|who|and|so|but|because|where|when)\s+)+"
 TRAIL = r"(\s+(and|so|but|that|the|a|to|of|with|they're|he's|she's|it's|i'm|was|is|in|on|my|his|her))+$"

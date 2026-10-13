@@ -53,6 +53,21 @@ strongest word in red, a red serif quote mark, "— ADAM ROBERTS", Adam in the c
 phrase the news bars didn't use, one per video. Stat card: the number + unit said most often ("24 HOURS",
 "two hours" -> 2 HOURS) as a huge red number. Captions hide while a card is up (the card shows the words).
 
+**Year strip (Oct 13 2026).** When Adam names two different years within 20 s ("in 1999 ... by 2005"), or a year and
+"now / today / nowadays / this year / these days", or "since 2010" (= to now), a ruler slides from the first year
+said to the second: a tick per year (taller every 5 and 10), the years he names in mint, a red marker in the middle,
+and the year under the marker big above it, turning mint with a pop when it lands. ~3.2 s of finished video, one per
+video, plan id `year:<a>-<b>`, on by default (you switch it off). "Now" is the project's date (project.json `date`,
+`--year` to autoplan), else this year. autoplan step 4b runs after place cards/library/stock and before news bars;
+if its moment is busy it slides later, up to 1.5 s past the second year, else it's listed off ("skipped: overlaps").
+Where it sits (stagereel.swift `case "year"`): top half, always above his head. Under the title band if that fits
+and misses the captions; else over the title band (band + logo hide for those seconds) if that misses the captions;
+else whichever of the two fits, with captions paused. No room above his head at all -> the free graphics zone.
+Dashboard: indigo "Year strip", row reads "📅 2010 → 2026". Tested on Another Day in Paradise's Sal reel ("since
+Attica in 2010" -> 2010 → 2026; in the real project the Attica place card + archive photo own that moment, so the
+strip is listed off there) with the place card switched off in a throwaway copy, and on One Year's reel_living with
+a year written into a copy of the transcript: frames across the slide, head clear, captions kept, loudness normal.
+
 **Stat number counts up (Oct 13 2026).** The stat card's big red number ("2 HOURS", "24 HOURS") now counts up
 from 0 over 0.8 s, then holds, with a small pop when it lands (scale 1 -> 1.16 -> 0.97 -> 1 over 0.26 s). It is a
 stack of pre-rendered number images in one box that fades in with the card; each image has its own discrete opacity

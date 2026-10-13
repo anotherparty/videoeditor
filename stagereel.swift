@@ -101,6 +101,7 @@ struct Broll { let image: String?; let color: String?; let start: Double; let en
                var layout: String = "full"        // full (cutaway + bubble) | split (image top half, Adam bottom half) | pip (video only)
                var video: String? = nil }         // video clip: split, or pip = clip full screen + Adam shrunk into a framed corner box
 var PUNCHES: [Punch] = [], BROLLS: [Broll] = [], GRAPHICS: [[String:Any]] = [], NOCAPS: [(Double,Double)] = []
+var BAND_HIDE: [(Double,Double)] = []              // windows where a graphic (year strip) sits over the title band: band + logo hide
 if let ep = arg("--edit") {
     guard let data = FileManager.default.contents(atPath: ep),
           let o = try? JSONSerialization.jsonObject(with: data) as? [String:Any] else { die("bad --edit \(ep)") }
@@ -954,6 +955,71 @@ func makeGraphics(_ g: [String:Any], total: Double, contentDur: Double) -> [CALa
         let l = textCard(a, bg: NSColor(calibratedWhite: 0.04, alpha: 0.82), padX: 30, padY: 12, corner: 18, maxW: CGFloat(W) * 0.9)
         l.frame.origin = CGPoint(x: (CGFloat(W) - l.bounds.width) / 2, y: freeZoneCenterY(l.bounds.height, start: st, end: en) - l.bounds.height / 2)
         addFadeWindow(l, showStart: st, showEnd: en, total: total, fade: 0.15); addPop(l, at: st, from: 1.4); out.append(l)
+    case "year":    // year strip: a ruler (tick per year) slides from y0 to y1 under a red marker, the year under it big. Top half,
+                    // under the title band if it fits above his head, else over the band (band hides), else the free zone
+        let y0 = g["y0"] as? Int ?? 2000, y1 = g["y1"] as? Int ?? 2026, lo = min(y0, y1), hi = max(y0, y1), span = max(1, hi - lo)
+        let bw = CGFloat(W) - 60, bh: CGFloat = 212, rh: CGFloat = 96, ppy = max(22, min(130, 700 / CGFloat(span)))   // px per year
+        let lstep = [1, 5, 10, 20, 50].first { CGFloat($0) * ppy >= 105 } ?? 50                    // small year labels every lstep
+        let a0 = lo - Int(ceil(bw / 2 / ppy)) - 1, a1 = hi + Int(ceil(bw / 2 / ppy)) + 1            // ticks run past both ends
+        let rw = CGFloat(a1 - a0) * ppy + 4, xOf = { (y: Int) in CGFloat(y - a0) * ppy + 2 }, base = rh - 18
+        let la: [NSAttributedString.Key: Any] = [.font: btbFont(28), .foregroundColor: NSColor(calibratedWhite: 1, alpha: 0.8), .kern: 0.5]
+        let rimg = btbDraw(CGSize(width: Int(rw), height: Int(rh))) { c in
+            c.setFillColor(NSColor(calibratedWhite: 1, alpha: 0.35).cgColor); c.fill(CGRect(x: 0, y: base, width: rw, height: 3))
+            c.setFillColor(btbMint.cgColor); c.fill(CGRect(x: xOf(lo), y: base - 1, width: xOf(hi) - xOf(lo), height: 6))   // the years he names
+            for y in a0...a1 {
+                let th: CGFloat = y % 10 == 0 ? 40 : y % 5 == 0 ? 30 : 18, inR = y >= lo && y <= hi
+                c.setFillColor((inR ? btbMint : NSColor(calibratedWhite: 1, alpha: y % 5 == 0 ? 0.9 : 0.55)).cgColor)
+                c.fill(CGRect(x: xOf(y) - 2, y: base - th, width: 4, height: th))
+                if y % lstep == 0 || y == lo || y == hi {
+                    let t = NSAttributedString(string: String(y), attributes: la), ts = t.size()
+                    if y == lo || y == hi || (abs(y - lo) * Int(ppy) > 95 && abs(y - hi) * Int(ppy) > 95) { t.draw(at: NSPoint(x: xOf(y) - ts.width / 2, y: 0)) }
+                }
+            }
+        }
+        let box = CALayer(); box.bounds = CGRect(x: 0, y: 0, width: bw, height: bh)
+        box.backgroundColor = NSColor(calibratedWhite: 0.04, alpha: 0.84).cgColor; box.cornerRadius = 22
+        box.shadowColor = NSColor.black.cgColor; box.shadowOpacity = 0.45; box.shadowRadius = 14; box.shadowOffset = CGSize(width: 0, height: -4)
+        let clip = CALayer(); clip.frame = CGRect(x: 0, y: 10, width: bw, height: rh); clip.masksToBounds = true
+        let fadeM = CAGradientLayer(); fadeM.frame = clip.bounds; fadeM.startPoint = CGPoint(x: 0, y: 0.5); fadeM.endPoint = CGPoint(x: 1, y: 0.5)
+        fadeM.colors = [NSColor.clear, .black, .black, .clear].map { $0.cgColor }; fadeM.locations = [0, 0.16, 0.84, 1]; clip.mask = fadeM
+        let rl = CALayer(); rl.contents = rimg; rl.anchorPoint = .zero; rl.bounds = CGRect(x: 0, y: 0, width: rw, height: rh)
+        let px = { (y: Double) -> CGFloat in bw / 2 - 2 - CGFloat(y - Double(a0)) * ppy }        // ruler x that puts year y under the marker
+        rl.position = CGPoint(x: px(Double(y0)), y: 0); clip.addSublayer(rl); box.addSublayer(clip)
+        let t0 = st + 0.35, dur = min(2.0, max(1.0, (en - st) - 1.1))
+        let ss = { (u: Double) in u * u * (3 - 2 * u) }                                              // ease in-out
+        let mv = CAKeyframeAnimation(keyPath: "position.x"); let n = 30
+        mv.values = (0...n).map { NSNumber(value: Double(px(Double(y0) + Double(y1 - y0) * ss(Double($0) / Double(n))))) }
+        mv.beginTime = AVCoreAnimationBeginTimeAtZero + t0; mv.duration = dur; mv.fillMode = .both; mv.isRemovedOnCompletion = false
+        rl.add(mv, forKey: "slide")
+        let mk = CAShapeLayer(); let mp = CGMutablePath(); let mx = bw / 2, my = 10 + base         // red marker: triangle + line at centre
+        mp.move(to: CGPoint(x: mx - 15, y: my + 26)); mp.addLine(to: CGPoint(x: mx + 15, y: my + 26)); mp.addLine(to: CGPoint(x: mx, y: my + 4)); mp.closeSubpath()
+        mp.addRect(CGRect(x: mx - 2.5, y: my - 46, width: 5, height: 50)); mk.path = mp; mk.fillColor = brandRed.cgColor; box.addSublayer(mk)
+        // the big year: one picture per year (step k so <= 40), each shown while it's the one under the marker
+        let k = max(1, Int(ceil(Double(span) / 40))), dir = y1 >= y0 ? 1 : -1
+        var seq = stride(from: 0, to: span, by: k).map { y0 + dir * $0 }; seq.append(y1)
+        let inv = { (p: Double) -> Double in var a = 0.0, b = 1.0; for _ in 0..<30 { let m = (a + b) / 2; if ss(m) < p { a = m } else { b = m } }; return a }
+        let ts = seq.enumerated().map { i, y in i == 0 ? st : t0 + dur * inv(max(0, (Double(abs(y - y0)) - Double(k) / 2) / Double(span))) }
+        for (i, y) in seq.enumerated() {
+            let last = i == seq.count - 1
+            let (yi, ysz) = bigText(String(y), size: 92, color: last ? btbMint : .white)
+            let l = CALayer(); l.contents = yi; l.frame = CGRect(x: (bw - ysz.width) / 2, y: 10 + rh + 2 + (bh - 10 - rh - ysz.height) / 2 - 8, width: ysz.width, height: ysz.height)
+            addWindow(l, showStart: ts[i], showEnd: last ? en + 1 : ts[i + 1], total: total); box.addSublayer(l)
+            if last {
+                let p = CAKeyframeAnimation(keyPath: "transform.scale"); p.values = [1, 1.18, 0.97, 1]; p.keyTimes = [0, 0.35, 0.75, 1]
+                p.beginTime = AVCoreAnimationBeginTimeAtZero + ts[i]; p.duration = 0.28; p.fillMode = .both; p.isRemovedOnCompletion = false
+                l.add(p, forKey: "pop")
+            }
+        }
+        // spot (px from the top): under the title band, or over it (the band hides meanwhile); above his head either way.
+        // A spot that leaves the captions alone wins; else captions pause; no room above his head at all -> the free zone
+        let headPx = FACE.headTop * CGFloat(H), gap: CGFloat = 24, capTop = CGFloat(H) - BTB_BOTTOM - BTB_LINE * 2, capBot = CGFloat(H) - BTB_BOTTOM
+        let fits = [BAND_BOTTOM + gap, 40].filter { $0 + bh <= headPx - gap || !FACE.found }
+        let hitsCaps = { (t: CGFloat) in t < capBot && t + bh > capTop }
+        var top = fits.first { !hitsCaps($0) } ?? fits.first ?? CGFloat(H) - freeZoneCenterY(bh, start: st, end: en) - bh / 2
+        if fits.isEmpty { top = min(max(top, 0), CGFloat(H) - bh) }
+        else { if top < BAND_BOTTOM { BAND_HIDE.append((st, en)) }; if hitsCaps(top) { NOCAPS.append((st, en)) } }
+        box.position = CGPoint(x: CGFloat(W) / 2, y: CGFloat(H) - top - bh / 2)
+        addFadeWindow(box, showStart: st, showEnd: en, total: total, fade: 0.2); addPop(box, at: st, from: 1.12); out.append(box)
     case "emoji":   // big emoji pop beside the head, never on it
         let e = g["emoji"] as? String ?? "✨", sz: CGFloat = 190
         let a = NSAttributedString(string: e, attributes: [.font: NSFont(name: "AppleColorEmoji", size: sz) ?? NSFont.systemFont(ofSize: sz)])
@@ -1205,9 +1271,11 @@ func compose() {
         // btb: head-aware top band (logo + title card + tag); hidden during punches that push the head into it
         if let band = band {
             let lim = band.bottomFromTop / CGFloat(H) + 0.01
-            let hide = PUNCHES.filter { punchedHeadTop(face, $0) < lim }.map { ($0.start, $0.end) }
+            let hide = PUNCHES.filter { punchedHeadTop(face, $0) < lim }.map { ($0.start, $0.end) } + BAND_HIDE
             for l in band.layers { addHideWindows(l, hide: hide, contentDur: contentS, total: totalS); parent.addSublayer(l) }
-            addVisibleUntil(band.logo, contentDur: contentS, total: totalS); parent.addSublayer(band.logo)
+            if BAND_HIDE.isEmpty { addVisibleUntil(band.logo, contentDur: contentS, total: totalS) }
+            else { addHideWindows(band.logo, hide: BAND_HIDE, contentDur: contentS, total: totalS) }    // the year strip sits over it
+            parent.addSublayer(band.logo)
         }
         // sticker (whole content)
         if STYLE != "btb", let st = STICKER {
