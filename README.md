@@ -99,9 +99,24 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   first in the tray (red border) to drag onto a line or the timeline, and auto-place when their file name is said (same
   rules as the library, project files first). Footage box safety: once a main video exists, another video dropped there
   goes to project B-roll and never replaces it; "Replace main video…" (with a confirm) is the only way to swap it.
-- 📰 article.py + articlecard.swift (in progress): URL + exact passage -> clean news-page card with the highlighter sweep.
+- 📰 article.py + articlecard.swift: URL + exact passage -> clean news-page card with the highlighter sweep.
   find_articles(): Claude searches the web for up to 2 articles backing what Adam says; each passage is checked
-  word-for-word against the fetched page. Not wired into autoplan yet.
+  word-for-word against the fetched page.
+- 🗞 Article cards in the reels, automatically (Oct 13 2026): autoplan step 1b runs find_articles once per project over
+  the whole transcript (cached in work/articles.json), makes each card once (work/articles/), and any video whose cuts
+  hold the moment gets a split card (article top, Adam bottom, "kb": "none") starting on the word that names it, 6.5 s
+  of finished-video time (skipped under 4 s; never opens on the last sliver before a cut). ON by default, plan id
+  article:<domain>, why = outlet: headline (url); dashboard row shows "🗞 outlet: headline" + an "outlet ↗" link, own
+  colour, normal off switch. FIND_PROMPT tightened: the headline must be about the exact thing he names (same prison,
+  program, law, event, film, statistic); same broad topic is rejected (the old marijuana-legalization pick for the
+  visitor-with-marijuana story is the named counter-example), no personal anecdotes. Code checks too: Claude must name
+  the shared subject ("about") and one of its words must be in the headline; pages with no body paragraphs are skipped.
+  Tested: Phil transcript (zz copy of another-day-in-paradise) -> 0 picks in 3 of 3 runs (the old prompt took the
+  legalization story); one-year (zz copy) -> 2 picks, News 12's Sing Sing Prison Museum dropped (passage not word-for-word),
+  WYSO's "'Shawshank Redemption' turns 30" kept, on "Shawshank" at 33.2 s. Rendered reel_redemption + full: card on for
+  6.5 s, highlight sweeps in 0.6 s after it appears, headline/body readable, Adam's head under the seam, never covered;
+  loudness peak -0.9 / RMS -17.3 (reel) and -17.5 (full) dBFS. Switching it off on the dashboard wrote off.json and the
+  re-plan kept it listed, off, with a B-roll photo taking the gap.
 - ✂️ How tight? (Oct 12 2026): project setting `edit` = light (long pauses) / clean (+ every um and uh, default) /
   ruthless (shorter pauses + stutters and doubled words). transcribe.py --fillers makes Whisper write the ums down
   (one-year: 0 -> 6 found); deadair.py --drop-fillers/--drop-repeats cuts them. The Look section shows seconds each

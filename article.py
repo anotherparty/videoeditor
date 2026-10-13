@@ -12,7 +12,7 @@ Prints the card .json path (use it as "card" in beats.json), or exits 1 with the
 
 find_articles() is the "I find them myself" part: Claude reads the transcript, searches the web and proposes up to
 2 articles + a passage; each passage is then checked word-for-word against the fetched page (no invented quotes).
-autoplan.py calls it once per project (cached in work/articles.json); the cards arrive switched OFF until Adam approves.
+autoplan.py calls it once per project (cached in work/articles.json); the cards arrive switched ON (Adam switches off).
 """
 import argparse, json, os, re, subprocess, sys, urllib.request
 from pathlib import Path
@@ -23,12 +23,19 @@ CLAUDE = Path.home() / ".local/bin/claude"
 FIND_PROMPT = """You find news articles to show as B-roll in a short vertical video by Adam Roberts, a formerly
 incarcerated writer. Below is what he says, with timestamps in seconds.
 Pick AT MOST 2 moments where a real published article from a reputable source (news outlet, public radio,
-nonprofit newsroom) directly backs up or gives context to what he says: a public fact, a prison, a law, a
-public event, a statistic. Never pick anything about the private people he mentions (friends, family, people
-still inside, their cases). If nothing fits, return an empty list. That is a fine answer.
+nonprofit newsroom) is DIRECTLY ABOUT the specific thing he names at that moment: the same named prison, program,
+law, public event, film or statistic. The article's headline must be about that exact thing, so a viewer reading it
+while he speaks sees it is the same story. Same broad topic is NOT enough: if he tells a story about a visitor who
+brought marijuana to a parole office, an article about statewide marijuana legalization is WRONG (reject it); if he
+names the 1971 Attica uprising, an article about the Attica uprising fits. Never pick his own
+personal anecdotes, and never anything about the private people he mentions (friends, family, people still inside,
+their cases). Before answering, check each pick: would a viewer think the headline is about exactly what he is
+saying right then? If not, drop it. If nothing fits, return an empty list. That is a fine, common answer.
 For each pick: search the web, open the article, and copy one short passage (6 to 18 words) from the article
 BODY, not the headline, EXACTLY as written, character for character. Prefer free pages without a paywall.
-Reply with JSON only: {"articles": [{"t": <seconds where he says it>, "said": "<his words>", "url": "<article url>", "mark": "<exact passage>"}]}
+"t" = the timestamp of the line where he names it. "about" = the specific thing, in a few words, that both he and the
+headline are about.
+Reply with JSON only: {"articles": [{"t": <seconds>, "said": "<his words>", "about": "<the shared subject>", "url": "<article url>", "mark": "<exact passage>"}]}
 """
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 squash = lambda s: re.sub(r"\s+", " ", s.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')).strip()
@@ -90,8 +97,12 @@ def find_articles(lines, cache_p: Path):
     for pk in picks[:2]:
         try:
             art = fetch(pk["url"])
-            if find_para(art["paras"], pk["mark"]) is None: print(f"[article] dropped {pk['url']}: passage not word-for-word"); continue
-            found.append({"t": float(pk["t"]), "said": pk.get("said", ""), "url": pk["url"], "mark": squash(pk["mark"]),
+            if not pk.get("about"): print(f"[article] dropped {pk['url']}: no shared subject named"); continue
+            kw = {w for w in re.findall(r"[a-z0-9]{4,}", pk["about"].lower())}
+            if not kw & set(re.findall(r"[a-z0-9]{4,}", art["title"].lower())): print(f"[article] dropped {pk['url']}: headline is not about '{pk['about']}'"); continue
+            if not art["paras"]: print(f"[article] dropped {pk['url']}: no body paragraphs on the page"); continue
+            if find_para(art["paras"], pk["mark"]) is None: print(f"[article] dropped {pk['url']}: passage not word-for-word ('{pk['mark'][:60]}')"); continue
+            found.append({"t": float(pk["t"]), "said": pk.get("said", ""), "about": pk["about"], "url": pk["url"], "mark": squash(pk["mark"]),
                           "outlet": art["outlet"], "title": art["title"]})
         except Exception as ex: print(f"[article] dropped {pk.get('url')}: {type(ex).__name__}")
     cache_p.write_text(json.dumps(found, indent=1, ensure_ascii=False)); print(f"[article] {len(found)} of {len(picks)} articles verified")

@@ -10,6 +10,8 @@ Plans, in priority order (later items never overlap earlier ones):
   1. screenshot cards  (--shots): OCR'd, set on cards, strongest lines highlighted; split screen for text,
                         full screen + bubble for a title/cover image. Anchored at the first mention of a
                         registry person named on the screenshot, else the first "substack/piece/wrote..." word.
+  1b. article cards   article.py: Claude finds up to 2 real articles directly about what he says (cached in
+                        work/articles.json, passage checked word-for-word) -> split card with highlight, ~6.5 s, on
   2. name labels       first mention of anyone in registry/people.json          ("Sal · Friend since Attica")
   3. place cards       a registry place with a year nearby                        ("📍 ATTICA 2010")
   3. your library     ~/Projects/Reels/_library files whose name (or library.json keys) is said -> B-roll
@@ -157,6 +159,33 @@ def main():
                  "kb": "none" if is_text else "in", "layout": "split" if is_text else "full",
                  "why": f"screenshot {Path(p).name}" + (f", highlights: {marks}" if marks else "")}, s, e, force=True)
             t = e
+
+    # 1b. article cards: Claude finds real articles about what he says (once per project, work/articles.json, every passage
+    #     checked word-for-word); a video whose cuts hold the moment gets a split card for ~6.5 s. On by default, you switch off.
+    if os.environ.get("REELSTUDIO_NO_ARTICLES") != "1":
+        import article
+        segs_all = [s for s in json.load(open(a.transcript))["segments"] if s.get("text", "").strip()]
+        seen_ids = set()
+        for ar in article.find_articles([(s["start"], s["text"].strip()) for s in segs_all], work.parent / "articles.json"):
+            dom = re.sub(r"^www\.", "", urllib.parse.urlparse(ar["url"]).netloc); aid = f"article:{dom}"
+            if aid in seen_ids: aid += f"@{ar['t']:.0f}"
+            seen_ids.add(aid)
+            sg = next((x for x in segs_all if x["start"] - 0.6 <= ar["t"] <= x["end"]), None)
+            lw = [w for w in words if (sg["start"] - 0.05 if sg else ar["t"] - 3) <= w["start"] <= (sg["end"] if sg else ar["t"] + 5)]
+            kw = {norm(x) for x in ar.get("about", "").split() if len(x) >= 4}
+            w0 = next((w for w in lw if norm(w["word"]) in kw), lw[0] if lw else None)    # the word that names it, else the line start
+            if w0 is None: continue                                                           # not in this video's cuts
+            s = w0["start"]; r_ = next(r for r in ranges if r[0] <= s <= r[1])
+            if r_[1] - s < 0.5: s = min((lo for lo, hi in ranges if lo > s), default=s)     # don't open on the last sliver before a cut
+            o_e = out_t(s) + 6.5                                                              # 6.5 s on screen, in finished-video time
+            e = min([lo + (o_e - out_t(lo)) for lo, hi in ranges if out_t(lo) <= o_e <= out_t(lo) + hi - lo] or [reel_end])
+            if out_t(e) - out_t(s) < 4.0: continue                                           # too little room to read it
+            cj = work.parent / "articles" / f"{re.sub(r'[^a-z0-9]+', '_', aid.lower())}.json"
+            if not cj.exists():
+                try: article.make_card(ar["url"], [ar["mark"]], cj.with_suffix(".jpg"))
+                except Exception as ex: print(f"[autoplan] article card failed for {ar['url']}: {ex}"); continue
+            add({"id": aid, "type": "broll", "card": str(cj), "kb": "none", "layout": "split", "outlet": ar["outlet"], "url": ar["url"],
+                 "why": f"{ar['outlet']}: {ar['title']} ({ar['url']})"}, s, e)
 
     # 2. name labels (first mention)
     for p in people:
@@ -322,7 +351,7 @@ def main():
                   and w["word"].strip(" ,.?!") not in COMMON_CAPS | ignore and norm(w["word"]) not in known})
     if unk: print("UNKNOWN NAMES (add to registry/people.json or places.json):", ", ".join(unk))
 
-    beats = [{k: v for k, v in x.items() if k not in ("on", "why")} for x in plan if x["on"]]
+    beats = [{k: v for k, v in x.items() if k not in ("on", "why", "outlet", "url")} for x in plan if x["on"]]
     json.dump(beats, open(a.out, "w"), indent=1, ensure_ascii=False)
     if a.plan: json.dump(sorted(plan, key=lambda x: x["src"][0]), open(a.plan, "w"), indent=1, ensure_ascii=False)
     print(f"[autoplan] {len(beats)} beats on, {len(plan) - len(beats)} off -> {a.out}")

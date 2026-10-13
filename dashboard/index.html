@@ -9,7 +9,7 @@
   --bg:#f7f1e6; --panel:#fffdf8; --ink:#1d1a17; --muted:#6f665c; --line:#e5dccd;
   --red:#b22e26; --mint:#33f2c7; --purple:#8c2ef2; --ok:#1f8a5b; --warn:#b7791f;
   --label:#2f6fdb; --place:#c2410c; --emoji:#a16207; --broll:#7c3aed; --stock:#0f766e;
-  --lib:#be185d; --auto:#9d174d; --hand:#1d1a17; --news:#dc2626; --card:#0e7490;
+  --lib:#be185d; --auto:#9d174d; --hand:#1d1a17; --news:#dc2626; --card:#0e7490; --article:#4d7c0f;
   --r:14px; --shadow:0 1px 2px rgba(40,30,20,.06),0 4px 16px rgba(40,30,20,.06);
 }
 *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -119,6 +119,7 @@ a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center}
 .it .t{color:var(--muted);font-variant-numeric:tabular-nums;width:40px;flex:none}
 .it .w{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .it.off .w{text-decoration:line-through;color:var(--muted)}
+.it .lnk{flex:none;font-size:12px;color:var(--muted);text-decoration:none}.it .lnk:hover{color:var(--ink)}
 .sw{position:relative;width:32px;height:18px;flex:none;cursor:pointer}
 .sw input{opacity:0;position:absolute;inset:0;cursor:pointer;margin:0}
 .sw span{position:absolute;inset:0;border-radius:99px;background:#d6ccbc;transition:.15s;pointer-events:none}
@@ -194,8 +195,8 @@ h2.sec.collapsed + *{display:none}
 </div>
 <script>
 const COLORS={label:'var(--label)',place:'var(--place)',emoji:'var(--emoji)',broll:'var(--broll)',stock:'var(--stock)',
-  lib:'var(--lib)',auto:'var(--auto)',hand:'var(--hand)',news:'var(--news)',card:'var(--card)'};
-const KINDS={label:'Name label',place:'Place card',emoji:'Emoji',broll:'Screenshot',stock:'Stock footage',lib:'Your library',auto:'Your B-roll, placed by Claude',hand:'Placed by you',news:'News bar',card:'Quote / stat card'};
+  lib:'var(--lib)',auto:'var(--auto)',hand:'var(--hand)',news:'var(--news)',card:'var(--card)',article:'var(--article)'};
+const KINDS={label:'Name label',place:'Place card',emoji:'Emoji',broll:'Screenshot',stock:'Stock footage',lib:'Your library',auto:'Your B-roll, placed by Claude',hand:'Placed by you',news:'News bar',card:'Quote / stat card',article:'Article card'};
 const $=s=>document.querySelector(s);
 let cur=null, data=null, timer=null, editing=false, LASTSIG='', LASTVID=null;
 // spacebar plays / pauses the video you last played (unless you're typing)
@@ -206,7 +207,7 @@ const api=(p,o={})=>fetch(p,{headers:{'Content-Type':'application/json'},...o}).
 const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b||{})});
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const kind=it=>{const p=String(it.id||'').split(':')[0];
-  return {stock:'stock',lib:'lib',auto:'auto',hand:'hand',pending:'hand',quote:'card',stat:'card',news:'news'}[p]||(it.type==='broll'?'broll':it.type)};
+  return {stock:'stock',lib:'lib',auto:'auto',hand:'hand',pending:'hand',quote:'card',stat:'card',news:'news',article:'article'}[p]||(it.type==='broll'?'broll':it.type)};
 const fmt=t=>{t=Math.max(0,t);return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0')};
 
 async function loadList(){
@@ -343,7 +344,7 @@ function vidCard(o){
   const PX=28, tlW=Math.round(span*PX), tlH=Math.max(1,lanes.length)*32+6;
   const tl=plan.map((i,n)=>`<div class="tl ${i.on?'':'off'} ${i.moved?'moved':''} ${i.pending?'pending':''}" data-id="${esc(i.id)}" data-s="${i.src[0]}" data-e="${i.src[1]}" title="${esc(i.why)}" style="top:${4+lane[n]*32}px;left:${(i.src[0]-start)/span*100}%;width:${(i.src[1]-i.src[0])/span*100}%;background:${COLORS[kind(i)]}"><i class="h l"></i>${esc(label(i))}<i class="h r"></i></div>`).join('');
   const items=plan.filter(i=>!i.pending).map(i=>`<div class="it ${i.on?'':'off'}"><i class="k" style="background:${COLORS[kind(i)]}"></i>
-    <span class="t">${fmt(i.src[0]-start)}</span><span class="w" title="${esc(i.why)}">${esc(label(i))}</span>
+    <span class="t">${fmt(i.src[0]-start)}</span><span class="w" title="${esc(i.why)}">${esc(label(i))}</span>${/^https?:\/\//.test(i.url||'')?`<a class="lnk" href="${esc(i.url)}" target="_blank" rel="noopener" title="${esc(i.url)}">${esc(i.outlet||'article')} ↗</a>`:''}
     <label class="sw"><input type="checkbox" data-tog="${esc(i.id)}" data-v="${o.name}" ${i.on?'checked':''}><span></span></label></div>`).join('');
   const P=o.posting||{};
   const plat=[['instagram','Instagram'],['facebook','Facebook'],['youtube','YouTube']].map(([k,n])=>
@@ -397,6 +398,7 @@ function label(i){
   if(k==='lib')return `🎞 ${(i.image||i.video||'').split('/').pop()}${skip}`;
   if(k==='auto')return `🖼 ${(i.image||i.video||'').split('/').pop()}${skip}`;
   if(k==='hand')return `✋ ${(i.image||i.video||'').split('/').pop()}`;
+  if(k==='article')return `🗞 ${i.outlet||''}: ${(i.why||'').replace(/^[^:]*:\s*/,'').replace(/\s*\(https?:[^)]*\).*$/,'')}${skip}`;
   if(k==='stock')return `🎥 stock: ${String(i.id).slice(6)}${skip}`;
   if(i.type==='label')return `${i.name} · ${i.role}`;
   if(i.type==='place')return `📍 ${i.place} ${i.year||''}`;
