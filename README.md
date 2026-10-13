@@ -25,6 +25,12 @@ tuned a project's look, press **Save this look to the preset** in section 2 of t
 type a lesson. Every project after that starts from the improved version. Title card, date and reel tags
 stay per project. When Claude works on a project, it reads the preset's `notes` first and follows them.
 
+**Project types (Oct 12 2026).** The dropdown under "New project name" picks the preset: Another Party,
+Talking head (btb captions), Panel / interview (box captions, "Watch the full panel"), Comics / book club
+(typewriter captions, @adam_drawseverything). Each is just a file in `presets/`; add a file to add a type.
+Planned next: Post panel (caption + hashtag sets per account, YouTube Shorts / Instagram post buttons,
+Substack draft), a CapCut-style drag timeline, and more B-roll options.
+
 ## Pieces
 
 | file | job |

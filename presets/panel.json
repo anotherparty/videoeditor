@@ -1,0 +1,14 @@
+{
+ "name": "Panel / interview",
+ "blurb": "Several speakers: name label for each person, full cut plus reels.",
+ "look": {
+  "cta": "Watch the full panel",
+  "handle": "adamrobertswrites.substack.com",
+  "cap_style": "box",
+  "loudness": -15
+ },
+ "notes": [
+  "2026-10-12: Every speaker gets a name label; add UNKNOWN NAMES from autoplan to the registry before rendering.",
+  "2026-10-12: Room audio varies by mic; always normalize."
+ ]
+}

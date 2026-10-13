@@ -22,7 +22,8 @@ aside{border-right:1px solid var(--line);padding:20px 14px;position:sticky;top:0
 .proj{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 12px;border-radius:10px;cursor:pointer;margin-bottom:2px}
 .proj:hover{background:#ebe1d0} .proj.on{background:var(--ink);color:#fff}
 .proj small{display:block;opacity:.65;font-size:12px}
-.new{display:flex;gap:6px;margin:14px 4px 0}
+.new{display:flex;flex-wrap:wrap;gap:6px;margin:14px 4px 0}
+.new select{order:3;flex-basis:100%;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 6px}
 .new input{flex:1;min-width:0;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 10px}
 main{padding:26px 32px 80px;max-width:1180px}
 h1{font:800 28px/1.1 "Avenir Next",sans-serif;margin:0;letter-spacing:-.4px}
@@ -106,7 +107,7 @@ pre.log{background:#1d1a17;color:#e9e3d8;border-radius:12px;padding:12px 14px;fo
   <aside>
     <div class="brand"><b>Reel Studio</b><span>Another Party</span></div>
     <div id="plist"></div>
-    <form class="new" id="newf"><input id="newname" placeholder="New project name"><button class="btn small dark">Add</button></form>
+    <form class="new" id="newf"><input id="newname" placeholder="New project name"><select id="newtype" title="Project type"></select><button class="btn small dark">Add</button></form>
   </aside>
   <main id="main"><div class="empty">Pick a project on the left, or start a new one.</div></main>
 </div>
@@ -127,8 +128,9 @@ async function loadList(){
   document.querySelectorAll('.proj').forEach(b=>b.onclick=()=>open(b.dataset.id));
   if(!cur&&ps.length) open(ps[0].id);
 }
+fetch('/api/presets').then(r=>r.json()).then(ps=>{$('#newtype').innerHTML=ps.map(p=>`<option value="${p.id}" title="${esc(p.blurb)}">${esc(p.name)}</option>`).join('')});
 $('#newf').onsubmit=async e=>{e.preventDefault();const n=$('#newname').value.trim();if(!n)return;
-  const r=await post('/api/projects',{name:n});$('#newname').value='';cur=r.id;await loadList();open(r.id)};
+  const r=await post('/api/projects',{name:n,preset:$('#newtype').value});$('#newname').value='';cur=r.id;await loadList();open(r.id)};
 
 async function open(id){cur=id;try{localStorage.setItem('reelstudio.cur',id)}catch(e){}
   document.querySelectorAll('.proj').forEach(b=>b.classList.toggle('on',b.dataset.id===id));await refresh(true)}

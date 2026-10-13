@@ -84,6 +84,9 @@ class H(BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path); parts = [urllib.parse.unquote(x) for x in u.path.strip("/").split("/")]
         if u.path in ("/", "/index.html"):
             return self.send(200, (HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if parts[:2] == ["api", "presets"]:    # project types for the "Add" picker
+            return self.send(200, [{"id": f.stem, "name": jload(f, {}).get("name", f.stem), "blurb": jload(f, {}).get("blurb", "")}
+                                   for f in sorted(PRESETS.glob("*.json"))])
         if parts[:2] == ["api", "projects"]:
             out = []
             for pid, p in projects().items():

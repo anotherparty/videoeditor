@@ -1,0 +1,14 @@
+{
+ "name": "Talking head",
+ "blurb": "Just you on camera: cut dead air, captions, auto reel picks.",
+ "look": {
+  "cta": "Read the Substack",
+  "handle": "adamrobertswrites.substack.com",
+  "cap_style": "btb",
+  "loudness": -15
+ },
+ "notes": [
+  "2026-10-12: Overlays never cover Adam's head or hair; shrink the logo/box instead.",
+  "2026-10-12: Let the story breathe; don't force round-number reel lengths."
+ ]
+}
