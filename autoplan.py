@@ -53,6 +53,7 @@ def main():
     work = Path(a.work); work.mkdir(parents=True, exist_ok=True)
     ranges = [tuple(map(float, p.split("-"))) for p in a.cuts.split(",")]
     inside = lambda t: any(lo <= t <= hi for lo, hi in ranges)
+    out_t = lambda t: sum(max(0.0, min(t, hi) - lo) for lo, hi in ranges)   # source time -> time in the finished video
     reel_end = max(hi for lo, hi in ranges)
     end_of = lambda t: reel_end
     words = sorted((w for s in json.load(open(a.transcript))["segments"] for w in s.get("words", [])), key=lambda w: w["start"])
@@ -76,6 +77,7 @@ def main():
     moves = {k: tuple(v) for k, v in (load(a.moves, {}) if a.moves else {}).items()}
     plan, taken = [], list(moves.values())      # taken = (start, end) source-time intervals; your moved spans are reserved
     def free(s, e, gap=0.4): return all(e + gap <= t0 or s >= t1 + gap for t0, t1 in taken)
+    def ofree(s, e, gap): return all(out_t(e) + gap <= out_t(t0) or out_t(s) >= out_t(t1) + gap for t0, t1 in taken)  # gap as seen (cuts shrink it)
     def add(item, s, e, force=False):
         if item["id"] in moves:           # you dragged it on the timeline: your span wins, and it's always on
             s, e = moves[item["id"]]; force = True; item["moved"] = True; item["why"] += " (moved by you)"
@@ -262,14 +264,15 @@ def main():
         left = [f for f in sorted(Path(a.pool).iterdir()) if f.suffix.lower() in VIDS | {".jpg", ".jpeg", ".png"}
                 and str(f) not in placed_paths and f"lib:{f.name}" not in off]
         segs = [s for s in json.load(open(a.transcript))["segments"] if s.get("text", "").strip()]
-        picks = broll_auto(left, segs, work)
+        picks = broll_auto(left, segs, work, skip={f.name for f in left if f"auto:{f.name}" in off})   # switched off: don't ask
         t0 = min(lo for lo, hi in ranges) + 3.0                     # never over the hook (first 3 s)
-        ok_at = lambda s: inside(s) and inside(s + 3.0) and s >= t0 and free(s, min(s + 3.8, end_of(s)), 1.5)   # 1.5 s of Adam between pictures, no flicker
+        ok_at = lambda s: inside(s) and out_t(min(s + 3.8, end_of(s))) - out_t(s) >= 2.5 and s >= t0 and ofree(s, min(s + 3.8, end_of(s)), 1.5)   # 1.5 s of Adam between pictures on screen, no flicker
         def auto_item(f, s, why):
             item = {"id": f"auto:{f.name}", "type": "broll", "why": why}
             if f.suffix.lower() in VIDS: item.update(video=str(f), layout="pip")
             else: item.update(image=str(f), kb=next(KB))
             add(item, s, min(s + 3.8, end_of(s)))
+            if item["on"]: plan[:] = [x for x in plan if not (x["id"] == f"lib:{f.name}" and not x["on"] and x["id"] not in off)]  # no twin
         for f in left:
             p_ = picks.get(f.name) or {}
             if not p_.get("moments"): rest.append(f); continue          # no Claude, or nothing he says fits: spread it
@@ -279,8 +282,12 @@ def main():
                 return next((w["start"] for w in (sg or {}).get("words", []) if norm(w["word"]).rstrip("s") in {x.rstrip("s") for x in seen}), m)
             ms = [snap(m) for m in p_["moments"] if inside(m) or inside(snap(m))]
             if not ms: continue                                         # its moments are outside this video's window
-            nudge = sorted((k * 0.5 for k in range(-20, 61)), key=lambda d: d if d >= 0 else -3 * d)  # nearest free spot: up to 30 s later / 10 s earlier
-            s = next((m + d for m in ms for d in nudge if ok_at(m + d)), None)
+            def span(m):                                                # slide only while he's still on that line (or 5 s on / 3 s back)
+                sg = next((x for x in segs if x["start"] - 0.6 <= m <= x["end"]), None)
+                return (sg["start"] - 1.0, max(sg["end"] - 2.0, m)) if sg else (m - 3.0, m + 5.0)
+            nudge = sorted((k * 0.5 for k in range(-60, 61)), key=lambda d: d if d >= 0 else -2 * d)   # closest first, later preferred
+            wins = [(m, *span(m)) for m in ms]
+            s = next((m + d for d in nudge for m, lo, hi in wins if lo <= m + d <= hi and ok_at(m + d)), None)
             if s is None: rest.append(f); continue                       # its moments are full: the even spread keeps it on
             line = ([x["text"].strip() for x in segs if x["start"] <= s + 1.0] or [""])[-1]
             auto_item(f, s, f"Claude saw {p_.get('saw', 'the picture')} -> '{line[:70]}'")
@@ -290,10 +297,10 @@ def main():
         lo_, hi_ = t0, reel_end - 4.0
         for k, f in enumerate(rest):
             aim = lo_ + (hi_ - lo_) * (k + 0.5) / len(rest)
-            near = lambda s: any(abs(s - x["src"][0]) < 6.0 for x in plan if x["on"] and str(x["id"]).startswith("auto:"))
+            near = lambda s: any(abs(out_t(s) - out_t(x["src"][0])) < 6.0 for x in plan if x["on"] and str(x["id"]).startswith("auto:"))
             cand = sorted((aim + d * 0.5 for d in range(-int(hi_ - lo_) * 2, int(hi_ - lo_) * 2 + 1)), key=lambda s: abs(s - aim))
             s = next((c for c in cand if lo_ <= c <= hi_ and ok_at(c) and not near(c)), None)
-            if s is not None: auto_item(f, s, f"spread into a free gap ({'Claude unavailable' if not picks.get(f.name) else 'Claude saw ' + picks[f.name].get('saw', '') + (', its moments were full' if picks[f.name].get('moments') else ', no matching moment')})")
+            if s is not None: auto_item(f, s, f"spread into a free gap ({('switched off, Claude not asked' if f'auto:{f.name}' in off else 'Claude unavailable') if not picks.get(f.name) else 'Claude saw ' + picks[f.name].get('saw', '') + (', its moments were full' if picks[f.name].get('moments') else ', no matching moment')})")
 
     # 8. emoji: first use of each, at least 5s apart from each other
     used, last = set(), -99.0
@@ -381,13 +388,13 @@ talks about the tree, a painting when he talks about painting); if nothing he sa
 {"1": {"saw": "...", "moments": [12.3, 45.0]}, "2": {...}}
 """
 
-def broll_auto(files, segs, work: Path):
+def broll_auto(files, segs, work: Path, skip=()):
     """{file name: {"saw", "moments": [source seconds]}} for project B-roll Claude has looked at. One CLI call for the
     files not yet asked (videos: one frame); cached in work/broll_auto.json by name + mtime so renders don't re-ask.
     Claude off / failing -> {} for those files (the caller spreads them evenly)."""
     cache_p = work.parent / "broll_auto.json"; cache = load(cache_p, {})
     key = lambda f: f"{f.name}|{int(f.stat().st_mtime)}"
-    todo = [f for f in files if key(f) not in cache]
+    todo = [f for f in files if key(f) not in cache and f.name not in skip]
     if todo and CLAUDE.exists() and os.environ.get("REELSTUDIO_NO_CLAUDE") != "1":
         th = work / "broll_thumbs"; th.mkdir(parents=True, exist_ok=True); pics = []
         for f in todo:                                     # small jpgs: quick for Claude to Read

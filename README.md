@@ -139,6 +139,18 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   checked frame by frame at every placement (tree photos on "tree... right outside", sunset sky on "I watched the sun go
   down", paintings and marker clips on "I painted for people"), Adam's face in the bubble/PiP box, never covered;
   loudness peak -0.9 / RMS -17.4 dBFS. Switching one off on the dashboard dropped it on re-plan; the others stayed.
+- 🖼 B-roll spacing + honesty fixes (Oct 12 2026, late): a review render showed two sky photos 0.38 s apart (a cut
+  between them shrank the 1.5 s gap). Gaps are now measured in finished-video time (`out_t` / `ofree` in autoplan.py):
+  1.5 s of Adam between pictures, 6 s between spread pictures, and each picture must be on screen at least 2.5 s
+  (one used to straddle a cut and flash for 1.4 s). Claude's picks now slide only within the line he's saying at that
+  moment (3 s back if no line); a picture whose lines are all taken goes to the even spread and its "why" says so,
+  instead of landing up to 30 s away under an unrelated line. A name-matched file whose library slot was skipped for
+  overlap no longer shows twice (the skipped twin is dropped once the auto copy is on). A file you switched off is not
+  sent to Claude. Dashboard: the plan-list switch now stays where you put it (toggle also writes plan.json).
+  Tested on zz-flicker (one-year + 17 B-roll files): closest gap between any two graphics 1.52 s on screen, spread
+  pictures 8.1 s apart, no-Claude plan 17/17 on and 6.09 s apart; frames checked at every graphic and every gap;
+  loudness -0.9 / -17.4 dBFS. 8 of 17 pictures sit on a line Claude picked; 9 are spread (four sunset shots all wanted
+  the one "sun go down" line), so those are the ones to switch off if they don't fit.
 
 ## Pieces
 

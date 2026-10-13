@@ -506,6 +506,10 @@ class H(BaseHTTPRequestHandler):
             offp = p / "work" / f"{data['video']}.off.json"; off = set(jload(offp, []))
             (off.discard if data.get("on") else off.add)(data["id"])
             jsave(offp, sorted(off)); stale(data["video"])
+            planp = p / "work" / f"{data['video']}.plan.json"; plan = jload(planp, [])   # switch stays where you put it
+            for it in plan:
+                if it["id"] == data["id"]: it["on"] = bool(data.get("on"))
+            if plan: jsave(planp, plan)
             return self.send(200, {"ok": True})
         if act == "posting":              # {video, platform, value}
             cfg.setdefault("posting", {}).setdefault(data["video"], {})[data["platform"]] = data.get("value", "")
