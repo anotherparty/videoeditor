@@ -12,6 +12,9 @@ deadair.py — turn a word-level transcript into a --cuts list that drops dead a
   --drop-repeats also cuts stutters and doubled words ("I- I", "the the"). Whisper's word edges are often 0.1-0.3 s off,
   so a cut next to a dropped word snaps into real silence using <transcript>.env.json (transcribe.py writes it):
   the first quiet stretch after the word before, the last one before the word after; else the quietest 10 ms.
+- With the env map every plain pause cut also lands in real silence: it cuts only inside the longest quiet stretch
+  between the two words (blips under 120 ms bridged), keeping --pad of it each side; no real silence = no cut.
+  (Whisper's gaps are often a word's tail or a missed "yeah", not silence.)
 Prints the cut string (feed straight to makecaptions.py / stagereel.swift --cuts) and,
 on stderr, how much time was removed.
 """
@@ -62,29 +65,46 @@ def main() -> int:
 
     ev = Path(a.transcript).with_suffix(".env.json"); env = json.load(open(ev)) if ev.exists() else None
     if env: hop, db = env["hop"], env["db"]; quiet = sorted(db)[len(db) // 10] + 8     # room tone + 8 dB counts as silence
+    def quiet_runs(i0, i1, q, bridge=0):
+        """quiet stretches (40 ms+) in frames [i0, i1) as (first, last) frame; loud blips <= bridge frames are bridged"""
+        runs, r0 = [], None
+        for i in range(i0, i1 + 1):
+            ok = i < i1 and db[i] <= q
+            if ok and r0 is None: r0 = i
+            if not ok and r0 is not None:
+                if i - r0 >= 4:
+                    if runs and r0 - runs[-1][1] - 1 <= bridge: runs[-1] = (runs[-1][0], i - 1)
+                    else: runs.append((r0, i - 1))
+                r0 = None
+        return runs
     def snap(t0, t1, after):
         """cut point in [t0, t1]: inside the quiet stretch nearest the kept word (after=True: word is before t0)"""
         i0, i1 = max(0, int(t0 / hop)), min(len(db), int(t1 / hop))
         if i1 - i0 < 2: return None
-        runs, r0 = [], None                                      # quiet stretches of 40 ms+ as (first, last) frame
-        for i in range(i0, i1 + 1):
-            q = i < i1 and db[i] <= quiet
-            if q and r0 is None: r0 = i
-            if not q and r0 is not None:
-                if i - r0 >= 4: runs.append((r0, i - 1))
-                r0 = None
+        runs = quiet_runs(i0, i1, quiet)
         if not runs: return (min(range(i0, i1), key=lambda i: db[i]) + 0.5) * hop
         q0, q1 = runs[0] if after else runs[-1]; q0, q1 = q0 * hop, (q1 + 1) * hop; b = min(a.pad, (q1 - q0) / 2)
         return q0 + b if after else q1 - b
+    def pause(e, s):
+        """plain pause between kept words (e = end of one, s = start of next): (cut from, cut to) inside real silence, or None"""
+        i0, i1 = max(0, int(e / hop)), min(len(db), int(s / hop))
+        if i1 - i0 < 4: return None
+        q = min(-40, max(quiet, min(db[i0:i1]) + 6))            # louder room: quiet is near the local floor, never speech level
+        runs = quiet_runs(i0, i1, q, bridge=12)
+        if not runs: return None
+        q0, q1 = max(runs, key=lambda r: r[1] - r[0]); q0, q1 = q0 * hop + a.pad, (q1 + 1) * hop - a.pad
+        return (q0, q1) if q1 - q0 >= 0.05 else None
 
     # pad, clamp, and merge anything the padding made touch
     out = []
-    for s, e, sd, ed in ranges:
+    for k, (s, e, sd, ed) in enumerate(ranges):
         # next to a dropped word: snap into real silence (env), else the full breath pad where the gap allows
         pd = lambda g: a.pad if g is None else min(a.pad, max(0.0, g) + 0.03)
         s0, e0 = s - pd(sd), e + pd(ed)
         if env and ed is not None: e0 = snap(e, max(e + a.pad, e + ed + 0.03), True) or e0
         if env and sd is not None: s0 = snap(min(s - a.pad, s - sd - 0.03), s, False) or s0
+        if env and ed is None and k + 1 < len(ranges): c = pause(e, ranges[k + 1][0]); e0 = c[0] if c else ranges[k + 1][0]
+        if env and sd is None and k > 0: c = pause(ranges[k - 1][1], s); s0 = c[1] if c else ranges[k - 1][1]   # None: ranges touch, merge
         s, e = max(lo, s0), min(hi, e0)
         if out and s <= out[-1][1]:
             out[-1] = (out[-1][0], e)

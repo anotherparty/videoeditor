@@ -115,6 +115,15 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   Every filler cut now lands at -47..-55 dB source level except where speech runs straight through (Freeman-uh-as:
   the quietest dip, -36). Clean cuts 41 s, ruthless 46 s; both measure peak -0.9 / RMS -17.3 dBFS. The status pill
   says "Needs a re-render" (not "All videos ready") after a setting change sends a video back.
+  Oct 13 2026 review fix: ordinary pause cuts still used a blind 0.15 pad, so ruthless (gap 0.35) cut 80 ms out of
+  speech after "Huntington" (-19 dB) and every mode clipped "yeah" (38.80, -14 dB) and the "-ing" of "painting."
+  (125.64, -29 dB). deadair.py now cuts a pause only inside the longest real quiet stretch between the two words
+  (local floor + 6 dB, never above -40 dB; blips under 120 ms bridged), keeping 0.15 s of it each side; no silence =
+  no cut. Every non-filler cut edge in light / clean / ruthless now sits at -40 dB or quieter (was 11 / 14 / 17 louder
+  edges). Honest cut totals are smaller: light 27 s, clean 34 s, ruthless 36 s (were 37 / 41 / 46). The Freeman-uh cut
+  stays at 40.40: Whisper on the source shows "Freeman" runs 40.03-40.33 (the 39.94 dip is its "f"). Re-rendered on
+  clean and ruthless: no um/uh in captions or heard by Whisper in the render, peak -0.9 / RMS -17.5 dBFS both.
+  The pill also says "Needs a re-render" while a look preview is waiting (state "preview ready") and it was sent back.
 - ✋ Drop B-roll on the timeline (Oct 12 2026): a Wide video card has a library tray above its timeline. Drag a thumb
   (or a Finder file) onto the timeline: the drop's x position becomes the transcript time (3.8 s long) and is saved as
   hand-placed B-roll (`manual_broll`, same as a transcript-line drop). It shows as a dashed block until the next render.
