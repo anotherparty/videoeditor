@@ -4,21 +4,27 @@
    "attica"
   ],
   "name": "Attica",
-  "stock": "prison fence"
+  "stock": "prison fence",
+  "archive": "Attica prison",
+  "archive_must": "attica"
  },
  {
   "keys": [
    "sing sing"
   ],
   "name": "Sing Sing",
-  "stock": "prison wall"
+  "stock": "prison wall",
+  "archive": "Sing Sing prison",
+  "archive_must": "sing sing"
  },
  {
   "keys": [
    "fishkill"
   ],
   "name": "Fishkill",
-  "stock": "prison fence"
+  "stock": "prison fence",
+  "archive": "Fishkill Correctional",
+  "archive_must": "fishkill"
  },
  {
   "keys": [

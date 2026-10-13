@@ -13,6 +13,7 @@ Plans, in priority order (later items never overlap earlier ones):
   2. name labels       first mention of anyone in registry/people.json          ("Sal · Friend since Attica")
   3. place cards       a registry place with a year nearby                        ("📍 ATTICA 2010")
   3. your library     ~/Projects/Reels/_library files whose name (or library.json keys) is said -> B-roll
+  3b. archival still  registry place with "archive" -> public-domain Wikimedia photo (after its place card, or instead of stock)
   4. stock B-roll      a registry place/thing with a "stock" query -> Pixabay video (split) or photo (full)
   5. news bars       strongest sentences (STRONG words, numbers) -> red/white TV lower third, <= 1 per 40s
   6. quote card      best strong phrase not used by a news bar -> cream card, Adam in bubble (1 per video)
@@ -177,9 +178,15 @@ def main():
         i = hit[0]; s = words[i]["start"]
         yr = next((re.sub(r"\D", "", words[j]["word"]) for j in range(max(0, i - 8), min(len(words), i + 9))
                    if re.fullmatch(r"(19[5-9]\d|20[0-3]\d)", re.sub(r"\D", "", words[j]["word"]))), "")
+        arch = archive(pl["archive"], pl.get("archive_must", pl["name"]), work / "archive") if pl.get("archive") else None
+        archive_item = lambda s0, e0: add({"id": f"archive:{pl['name']}", "type": "broll", "image": arch["path"], "label": "ARCHIVE PHOTO",
+                                           "kb": next(KB), "why": f"archival: {arch['title']} ({arch['license']})"}, s0, e0)
         if pl.get("name") and yr:
             add({"id": f"place:{pl['name']}", "type": "place", "place": pl["name"], "year": yr,
                  "why": f"{pl['name']} + {yr}"}, s, min(s + 3.0, end_of(s)))
+            if arch and free(s + 3.0, s + 6.5): archive_item(s + 3.0, min(s + 6.5, end_of(s)))     # the real place, right after its card
+        elif arch and free(s, min(s + 3.8, end_of(s))):
+            archive_item(s, min(s + 3.8, end_of(s)))                                                  # real history beats stock
         elif pl.get("stock") and not a.no_stock:
             e = min(s + 3.8, end_of(s))
             if not free(s, e): continue
@@ -209,8 +216,10 @@ def main():
              + sum(w in NEWS_TURN for w in hw)
         scored.append((sc, words[ix[0]]["start"], hl, " ".join(words[i]["word"].strip() for i in ix)))
     span = sum(hi - lo for lo, hi in ranges); room = max(1, int(span // 40)); placed = []
-    for sc, s, hl, _ in sorted(scored, key=lambda x: -x[0]):
+    pol = polish([x for x in sorted(scored, key=lambda x: -x[0]) if x[0] >= 4][:8], words, work)   # Claude's sharper wording
+    for sc, s, hl, raw in sorted(scored, key=lambda x: -x[0]):
         if sc < 4 or len(placed) >= room or any(abs(s - p) < 30 for p in placed): continue
+        hl = pol.get(f"{s:.2f}|{raw}", {}).get("headline") or hl
         n0 = len([x for x in plan if x["on"]])
         add({"id": f"news:{s:.0f}", "type": "news", "headline": hl, "kicker": "", "why": f"strong line ({sc}): {hl}"}, s, min(s + 4.5, end_of(s)))
         if len([x for x in plan if x["on"]]) > n0: placed.append(s)
@@ -219,9 +228,10 @@ def main():
     card = lambda extra, s, e: add({"type": "broll", "color": "#F7F1E6", "bubble": "br", "kb": "none", "nocaps": True, **extra}, s, e)
     for sc, s, hl, raw in sorted(scored, key=lambda x: -x[0]):
         if sc < 4 or any(abs(s - p) < 20 for p in placed): continue
-        qt = headline(raw, 12); qw = qt.split()
+        pq = pol.get(f"{s:.2f}|{raw}", {})
+        qt = pq.get("quote") or headline(raw, 12); qw = qt.split()
         if len(qw) < 4: continue
-        hot = next((w for w in qw if norm(w) in NEWS_STRONG), max(qw, key=len))
+        hot = pq.get("hot") or next((w for w in qw if norm(w) in NEWS_STRONG), max(qw, key=len))
         n0 = len([x for x in plan if x["on"]])
         card({"id": f"quote:{s:.0f}", "quote": {"text": qt, "hot": norm(hot)}, "why": f"quote card ({sc}): {qt}"}, s, min(s + 4.5, end_of(s)))
         if len([x for x in plan if x["on"]]) > n0: break
@@ -280,6 +290,42 @@ def headline(s, maxw=8):
     best = max(range(len(ws) - maxw + 1), key=lambda i: sum(norm(w) in NEWS_STRONG or any(c.isdigit() for c in w) for w in ws[i:i + maxw]))
     return re.sub(LEAD, "", re.sub(TRAIL, "", " ".join(ws[best:best + maxw]).strip(" ,"), flags=re.I), flags=re.I)
 
+CLAUDE = Path.home() / ".local" / "bin" / "claude"
+POLISH_PROMPT = """You write on-screen text for a talking-head reel by Adam Roberts (formerly incarcerated writer; prison history and
+reentry). For each numbered spoken line below, write:
+- "headline": a TV-news lower-third headline, 3 to 7 words: state the news itself (what happened, to whom), specific,
+  never vague ("Another Friend Denied Parole", not "Word From Inside on Parole"). Strictly true to what he said: never
+  add, upgrade or change a fact (a phone call is not a reunion). No em dashes, no clickbait, no exclamation marks, no
+  hashtags. Never name or identify anyone still in prison unless the line already names them.
+- "quote": the most quotable 5 to 12 words he actually said in that line, lightly cleaned (drop um/like/you know), not
+  rewritten.
+- "hot": the one word in the quote that carries it (it gets highlighted).
+Reply with ONLY JSON: {"1": {"headline": "...", "quote": "...", "hot": "..."}, "2": {...}}
+"""
+
+def polish(cands, words, work: Path):
+    """Claude rewrites the picked lines as headlines / clean quotes. Cached per line in work/polish.json, so a re-render
+    costs nothing; any failure (no Claude, not signed in, timeout) silently falls back to the keyword wording."""
+    cache_p = work.parent / "polish.json"; cache = load(cache_p, {})
+    todo = [c for c in cands if f"{c[1]:.2f}|{c[3]}" not in cache]
+    if todo and CLAUDE.exists() and os.environ.get("REELSTUDIO_NO_CLAUDE") != "1":
+        ctx = lambda s: " ".join(w["word"].strip() for w in words if s - 6 <= w["start"] <= s + 12)
+        body = "\n".join(f'{n}. Line: "{c[3]}"\n   Context: "{ctx(c[1])}"' for n, c in enumerate(todo, 1))
+        try:
+            r = subprocess.run([str(CLAUDE), "-p", POLISH_PROMPT + "\n" + body, "--output-format", "text"], capture_output=True,
+                               text=True, timeout=150, stdin=subprocess.DEVNULL, cwd=str(Path.home()))
+            m = re.search(r"\{.*\}", r.stdout, re.S); got = json.loads(m.group(0)) if m else {}
+            for n, c in enumerate(todo, 1):
+                g = got.get(str(n)) or {}
+                if g.get("headline"):
+                    g = {k: re.sub(r"\s*[\u2014\u2013]\s*", ", ", str(v)).strip(' ."') for k, v in g.items()}   # no em dashes, ever
+                    cache[f"{c[1]:.2f}|{c[3]}"] = g
+            json.dump(cache, open(cache_p, "w"), indent=1, ensure_ascii=False)
+            print(f"[autoplan] Claude polished {len(todo)} lines")
+        except Exception as ex:
+            print(f"[autoplan] Claude polish skipped ({type(ex).__name__}); using keyword wording")
+    return cache
+
 def fetch(url, out=None):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh) stage-reel/1.0"})
     data = urllib.request.urlopen(req, timeout=30).read()
@@ -303,6 +349,34 @@ def library():
             keys = [" ".join(ws)] + [w for w in ws if len(w) >= 4] if ws else []
         if keys: out.append((lf, keys))
     return out
+
+PD_LICENSES = ("public domain", "pd", "cc0", "no restrictions")
+
+def archive(q, must, cache: Path):
+    """Wikimedia Commons: a public-domain PHOTO whose title names the place (no attribution needed). Cached per query.
+    -> {"path", "title", "license"} or None"""
+    cache.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r"\W+", "_", q.lower()).strip("_"); meta_p = cache / f"{slug}.json"
+    if meta_p.exists():
+        m = load(meta_p, None); return m if m and Path(m["path"]).exists() else None
+    url = ("https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=30"
+           "&prop=imageinfo&iiprop=url|extmetadata|size&iiurlwidth=1080&gsrsearch=" + urllib.parse.quote(q))
+    try: pages = json.loads(fetch(url)).get("query", {}).get("pages", {}).values()
+    except Exception as ex: print(f"[autoplan] archive search failed: {ex}"); return None
+    best = None
+    for pg in pages:
+        ii = (pg.get("imageinfo") or [{}])[0]; title = pg.get("title", "")
+        lic = ii.get("extmetadata", {}).get("LicenseShortName", {}).get("value", "")
+        if not re.search(r"\.(jpe?g|png|tiff?)$", title, re.I) or must.lower() not in title.lower(): continue
+        if not lic.lower().startswith(PD_LICENSES) or ii.get("width", 0) < 700: continue
+        score = (bool(re.search(r"\b(19|20)\d\d\b", title)), ii.get("width", 0))   # dated photos first, then biggest
+        if not best or score > best[0]: best = (score, ii.get("thumburl") or ii.get("url"), title, lic)
+    if not best: json.dump(None, open(meta_p, "w")); return None
+    out = cache / f"{slug}.jpg"
+    try: fetch(best[1], out)
+    except Exception as ex: print(f"[autoplan] archive download failed: {ex}"); return None
+    m = {"path": str(out), "title": best[2].removeprefix("File:"), "license": best[3]}
+    json.dump(m, open(meta_p, "w"), indent=1); return m
 
 def stock(q, cache: Path, need: float):
     """Pixabay: a video clip >= need seconds (preferred), else a photo. Cached by query."""
