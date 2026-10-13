@@ -62,6 +62,19 @@ def stale_out(p, n):
 
 LIB = Path.home() / "Projects" / "Reels" / "_library"
 VIDS, IMGS = {".mp4", ".mov", ".m4v"}, {".jpg", ".jpeg", ".png"}
+sys.path.insert(0, str(HERE.parent)); from pipeline import EDITS, edit_args     # "How tight?" options, one definition
+
+def tightness(p):
+    """seconds each edit setting would cut from the whole video: {"light": 37.2, "clean": 42.5|None, ...}
+    (None = that setting needs a fresh listen that writes down the ums; the next render does it)"""
+    cfg = jload(p / "project.json", {}); tj = p / "work" / (Path(cfg.get("video", "x")).stem + ".json")
+    if not tj.exists(): return {}
+    fill = jload(tj, {}).get("fillers"); out = {}
+    for name, (_, needs, _) in EDITS.items():
+        if needs and not fill: out[name] = None; continue
+        r = subprocess.run(["python3", str(HERE.parent / "deadair.py"), str(tj), *edit_args(name)], capture_output=True, text=True)
+        m = re.search(r"cut ([\d.]+)s", r.stderr); out[name] = float(m[1]) if m else None
+    return out
 
 CLAUDE = Path.home() / ".local" / "bin" / "claude"                       # Claude Code CLI (uses Adam's subscription)
 CAPTION_PROMPT = Path.home() / ".config" / "another-party" / "caption_prompt.md"   # private: his voice + ig-caption rules
@@ -256,6 +269,8 @@ class H(BaseHTTPRequestHandler):
         if parts[0] == "lib" and len(parts) == 2:
             f = (LIB / parts[1]).resolve()
             return self.file(f) if f.parent == LIB.resolve() and f.is_file() else self.send(404, {"error": "no file"})
+        if parts[0] == "api" and len(parts) == 4 and parts[1] == "p" and parts[3] == "tightness":
+            p = projects().get(parts[2]); return self.send(200, tightness(p)) if p else self.send(404, {"error": "no project"})
         if parts[0] == "api" and len(parts) == 4 and parts[1] == "p" and parts[3] == "lines":
             p = projects().get(parts[2])
             return self.send(200, lines(p)) if p else self.send(404, {"error": "no project"})
@@ -405,6 +420,9 @@ class H(BaseHTTPRequestHandler):
         save = lambda: jsave(cfgp, cfg)
         stale = lambda n: stale_out(p, n)
         if act == "settings":
+            if data.get("edit") in EDITS and data["edit"] != cfg.get("edit", "clean"):   # how tight: every video re-cuts, the look stays approved
+                cfg["edit"] = data["edit"]; save()
+                for n in ["full"] + [r["name"] for r in cfg.get("reels", [])]: stale(n)
             look = {"sticker", "date", "cta", "handle", "cap_style", "full_tag"}
             changed = {k for k in data if cfg.get(k) != data[k]}
             cfg.update({k: v for k, v in data.items() if k in look | {"name", "make_full"}}); save()

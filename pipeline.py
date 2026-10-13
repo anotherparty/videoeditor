@@ -35,6 +35,12 @@ def jload(p, d):
     try: return json.load(open(p))
     except Exception: return d
 
+# how tight the edit is (project setting "edit"): gap between words that counts as dead air, cut ums, cut stutters/repeats
+EDITS = {"light": (0.7, False, False), "clean": (0.7, True, False), "ruthless": (0.35, True, True)}
+def edit_args(name):
+    gap, fill, rep = EDITS[name]
+    return ["--gap", str(gap)] + (["--drop-fillers"] if fill else []) + (["--drop-repeats"] if rep else [])
+
 class Run:
     def __init__(self, proj: Path):
         self.p = proj; self.work = proj / "work"; self.out = proj / "out"
@@ -64,10 +70,14 @@ class Run:
 
     def transcript(self):
         src = self.p / self.cfg["video"]; tj = self.work / (src.stem + ".json")
+        if tj.exists() and EDITS[self.edit()][1] and not jload(tj, {}).get("fillers"):    # cutting ums needs them written down
+            os.replace(tj, tj.with_suffix(".nofill.json"))                                # the old listen is kept
         if not tj.exists():
             self.say("transcribing (a minute or two)")
-            self.sh([VENV_PY, HERE / "transcribe.py", src, "--model", "small.en", "--out-dir", self.work])
+            self.sh([VENV_PY, HERE / "transcribe.py", src, "--model", "small.en", "--out-dir", self.work, "--fillers"])
         return tj
+
+    def edit(self): return self.cfg.get("edit") if self.cfg.get("edit") in EDITS else "clean"
 
     def shot_names(self):
         shots = [str(self.p / s) for s in self.cfg.get("shots", [])]
@@ -107,7 +117,7 @@ class Run:
         style = self.cfg.get("cap_style", "btb")
         mw, mc = (3, 16) if style == "btb" else (6, 30)
         self.say("cutting dead air", name)
-        cuts = self.sh(["python3", HERE / "deadair.py", tj, "--gap", "0.7", "--pad", "0.15", *(["--within", window] if window else [])]).strip()
+        cuts = self.sh(["python3", HERE / "deadair.py", tj, *edit_args(self.edit()), "--pad", "0.15", *(["--within", window] if window else [])]).strip()
         (self.work / f"{name}.cuts.txt").write_text(cuts)      # the dashboard maps video time <-> transcript time with this
         self.sh(["python3", HERE / "makecaptions.py", tj, "--cuts", cuts, "--max-words", mw, "--max-chars", mc, "--out", self.work / f"{name}.cues.json"])
         self.say("planning graphics", name)

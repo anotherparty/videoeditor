@@ -105,6 +105,10 @@ a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center}
 .timeline.over{outline:2px dashed var(--red);outline-offset:-2px}
 .tltray{margin-bottom:6px}
 .tray .th.mine{border:2px solid var(--red)}
+.tight{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.tight .tb{flex:1 1 160px;text-align:left;border:1px solid var(--line);border-radius:var(--r);background:#fffaf1;padding:9px 11px;cursor:pointer;display:flex;flex-direction:column;gap:3px}
+.tight .tb.on{border:2px solid var(--red);background:#fff1ea}
+.tight .tb small{color:var(--muted);font-size:12px}.tight .tb i{font-style:normal;font-size:12px;color:var(--red)}
 .tlbar{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:3px 2px 6px}
 .tlbar a{color:var(--red);cursor:pointer}
 .tltip{position:fixed;pointer-events:none;background:#222;color:#fff;font-size:12px;padding:3px 7px;border-radius:6px;z-index:9;display:none}
@@ -255,6 +259,10 @@ function render(){
 
   ${sec('look','2 · The look',esc(c.sticker||'')+' · '+({btb:'Books Through Bars',box:'White box',mono:'Typewriter'}[c.cap_style]||''),!!c.look_ok)}
   <div class="card">
+    <label class="f" style="margin-top:0">How tight should I cut it?</label>
+    <div class="tight">${[['light','Light','Long pauses only. Ums and stumbles stay.'],['clean','Clean','Pauses plus every um and uh.'],
+        ['ruthless','Ruthless','Shorter pauses, ums, stutters and doubled words. Fastest.']].map(([k,n,d])=>
+      `<button class="tb ${(c.edit||'clean')===k?'on':''}" data-edit="${k}"><b>${n}</b><small>${d}</small><i data-cut="${k}"></i></button>`).join('')}</div>
     <div class="grid2">
       <div><label class="f">Title card (top of every video)</label><input class="in" data-k="sticker" value="${esc(c.sticker)}" placeholder="Something that stops the scroll">
         <div class="chips">${sug||(c.video?(d.has_transcript?'':'<span class="chipv">Listening to the video for title ideas…</span>'):'')}</div></div>
@@ -418,7 +426,7 @@ function wire(){
     await post(`/api/p/${cur}/posting`,{video:b.dataset.v,platform:b.dataset.post,value:v});refresh(true)});
   document.querySelectorAll('[data-note]').forEach(el=>{el.onfocus=()=>editing=true;
     el.onblur=async()=>{editing=false;await post(`/api/p/${cur}/posting`,{video:el.dataset.note,platform:'note',value:el.value})}});
-  byHand(data.cfg); timelines(); posts();
+  byHand(data.cfg); timelines(); posts(); tight();
   document.querySelectorAll('h2.sec').forEach(h=>h.onclick=()=>{h.classList.toggle('collapsed');SEC[h.dataset.sec]=h.classList.contains('collapsed');
     try{localStorage.setItem('reelstudio.sec',JSON.stringify(SEC))}catch(e){}});
   document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{const h=$('#sec-'+b.dataset.jump);if(!h)return;
@@ -532,6 +540,12 @@ async function dropBroll(e,at,busy){
   if(path){await post(`/api/p/${cur}/broll_add`,{path,...at});refresh(true)}
 }
 const mmss=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+async function tight(){
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=async()=>{if(b.classList.contains('on'))return;
+    await post(`/api/p/${cur}/settings`,{edit:b.dataset.edit});refresh(true)});
+  if(!$('.tight'))return; const r=await api(`/api/p/${cur}/tightness`)||{};
+  document.querySelectorAll('[data-cut]').forEach(i=>{const v=r[i.dataset.cut];
+    i.textContent=v==null?(Object.keys(r).length?'I count the ums on the next render':''):`cuts ${Math.round(v)}s`})}
 async function byHand(c){
   if(!c.video||!$('#lines'))return;
   if(LINES.id!==cur){const r=await api(`/api/p/${cur}/lines`);LINES={id:cur,rows:Array.isArray(r)?r:[]}}

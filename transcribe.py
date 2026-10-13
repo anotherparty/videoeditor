@@ -26,6 +26,7 @@ def main() -> int:
     ap.add_argument("input")
     ap.add_argument("--model", default="base.en")
     ap.add_argument("--out-dir", default=str(Path(__file__).parent / "transcripts"))
+    ap.add_argument("--fillers", action="store_true", help="keep um/uh/false starts in the transcript so they can be cut")
     a = ap.parse_args()
 
     src = Path(a.input).expanduser()
@@ -40,7 +41,8 @@ def main() -> int:
 
     print(f"[transcribe] transcribing {src.name} …", flush=True)
     segments, info = model.transcribe(str(src), language="en", word_timestamps=True,
-                                      vad_filter=True)
+                                      vad_filter=True,     # a disfluent prompt makes Whisper write down the ums it normally hides
+                                      initial_prompt="Umm, so, uh, I- I was, like, you know, um, I mean, uh, hmm." if a.fillers else None)
 
     seg_list, txt_lines = [], []
     for seg in segments:
@@ -55,7 +57,7 @@ def main() -> int:
     dur = seg_list[-1]["end"] if seg_list else 0.0
     (out_dir / f"{stem}.txt").write_text("\n".join(txt_lines) + "\n", encoding="utf-8")
     (out_dir / f"{stem}.json").write_text(
-        json.dumps({"source": str(src), "model": a.model, "duration": dur,
+        json.dumps({"source": str(src), "model": a.model, "duration": dur, "fillers": a.fillers,
                     "segments": seg_list}, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n[transcribe] {len(seg_list)} segments, ~{ts(dur)} long", flush=True)
     print(f"[transcribe] wrote {out_dir/f'{stem}.txt'}", flush=True)

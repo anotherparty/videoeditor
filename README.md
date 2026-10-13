@@ -102,6 +102,10 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
 - 📰 article.py + articlecard.swift (in progress): URL + exact passage -> clean news-page card with the highlighter sweep.
   find_articles(): Claude searches the web for up to 2 articles backing what Adam says; each passage is checked
   word-for-word against the fetched page. Not wired into autoplan yet.
+- ✂️ How tight? (Oct 12 2026): project setting `edit` = light (long pauses) / clean (+ every um and uh, default) /
+  ruthless (shorter pauses + stutters and doubled words). transcribe.py --fillers makes Whisper write the ums down
+  (one-year: 0 -> 6 found); deadair.py --drop-fillers/--drop-repeats cuts them. The Look section shows seconds each
+  option cuts (one-year: 37 / 42.5 / 47.6 s of 3:33). Changing it re-cuts every video; the look stays approved.
 - ✋ Drop B-roll on the timeline (Oct 12 2026): a Wide video card has a library tray above its timeline. Drag a thumb
   (or a Finder file) onto the timeline: the drop's x position becomes the transcript time (3.8 s long) and is saved as
   hand-placed B-roll (`manual_broll`, same as a transcript-line drop). It shows as a dashed block until the next render.
