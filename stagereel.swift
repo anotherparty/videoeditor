@@ -848,7 +848,28 @@ func makeGraphics(_ g: [String:Any], total: Double, contentDur: Double) -> [CALa
         let ink = NSColor(calibratedWhite: 0.08, alpha: 1), cy = CGFloat(H) * 0.64
         if let num = g["num"] as? String {
             let (ni, ns) = bigText(num.uppercased(), size: 300, color: brandRed)
-            let nl = centered(ni, ns, y: cy + 140); addFadeWindow(nl, showStart: st, showEnd: en, total: total, fade: 0.15); addPop(nl, at: st, from: 1.5); out.append(nl)
+            // counts up 0 -> N over 0.8 s (a stack of pre-rendered numbers, discrete opacity windows, easing out), then a small pop
+            let m = num.uppercased().range(of: "[0-9][0-9,]*", options: .regularExpression)
+            let nv = m.map { Int(num.uppercased()[$0].replacingOccurrences(of: ",", with: "")) ?? 0 } ?? 0
+            if let m = m, nv > 0, num.range(of: "^(19|20)[0-9][0-9]$", options: .regularExpression) == nil {   // years don't count
+                let u = num.uppercased(), pre = String(u[..<m.lowerBound]), suf = String(u[m.upperBound...]), comma = u[m].contains(",")
+                let f = NumberFormatter(); f.numberStyle = .decimal; f.usesGroupingSeparator = comma; f.groupingSeparator = ","
+                let steps = min(nv, 20), cnt = 0.8, box = CALayer(); box.frame = CGRect(x: 0, y: 0, width: W, height: H)
+                let ts = (0...steps).map { st + cnt * pow(Double($0) / Double(steps), 1.4) }        // later steps take longer
+                for i in 0...steps {
+                    let v = Int((Double(nv) * Double(i) / Double(steps)).rounded())
+                    let (vi, vs) = i == steps ? (ni, ns) : bigText(pre + (f.string(from: NSNumber(value: v)) ?? "\(v)") + suf, size: 300, color: brandRed)
+                    let l = centered(vi, vs, y: cy + 140); addWindow(l, showStart: ts[i], showEnd: i == steps ? en + 1 : ts[i + 1], total: total); box.addSublayer(l)
+                    if i == steps {
+                        let p = CAKeyframeAnimation(keyPath: "transform.scale"); p.values = [1, 1.16, 0.97, 1]; p.keyTimes = [0, 0.35, 0.75, 1]
+                        p.beginTime = AVCoreAnimationBeginTimeAtZero + ts[i]; p.duration = 0.26; p.fillMode = .both; p.isRemovedOnCompletion = false
+                        l.add(p, forKey: "pop")
+                    }
+                }
+                addFadeWindow(box, showStart: st, showEnd: en, total: total, fade: 0.15); out.append(box)
+            } else {
+                let nl = centered(ni, ns, y: cy + 140); addFadeWindow(nl, showStart: st, showEnd: en, total: total, fade: 0.15); addPop(nl, at: st, from: 1.5); out.append(nl)
+            }
             let (li, ls) = bigText((g["label"] as? String ?? "").uppercased(), size: 80, color: ink)
             let ll = centered(li, ls, y: cy + 140 - ns.height / 2 - 20); addFadeWindow(ll, showStart: st + 0.2, showEnd: en, total: total, fade: 0.2); out.append(ll)
         } else {

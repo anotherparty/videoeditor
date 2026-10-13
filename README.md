@@ -53,6 +53,16 @@ strongest word in red, a red serif quote mark, "— ADAM ROBERTS", Adam in the c
 phrase the news bars didn't use, one per video. Stat card: the number + unit said most often ("24 HOURS",
 "two hours" -> 2 HOURS) as a huge red number. Captions hide while a card is up (the card shows the words).
 
+**Stat number counts up (Oct 13 2026).** The stat card's big red number ("2 HOURS", "24 HOURS") now counts up
+from 0 over 0.8 s, then holds, with a small pop when it lands (scale 1 -> 1.16 -> 0.97 -> 1 over 0.26 s). It is a
+stack of pre-rendered number images in one box that fades in with the card; each image has its own discrete opacity
+window. There are at most 20 steps, and the gaps grow toward the end so the count slows as it lands. Text around
+the number stays put ("$5", "1,000" keeps its comma). A year (19xx/20xx) and a number with no digits keep the old
+static pop. Tested on reel_off, with its real "2 hours" card plus test cards "24 hours" and "1,000 books" (renderer
+run straight into a scratch folder; only the source video was read). Frames show 0 -> 1 -> 2, 10 -> 18 -> 24 and
+450 -> 800 -> 1,000, one number at a time, as predicted. The landed "2" measures 89 px wide, 101 px at the pop
+(8.40-8.44 s), and 89 px again from 8.50 s. Sound after normalize: peak -0.9 / RMS -17.1 dBFS.
+
 **Quote types on (Oct 13 2026).** The quote card's line now types on letter by letter instead of sliding in: the
 same text image, masked by one strip per line that widens a letter at a time (discrete CoreAnimation steps), with a
 red caret riding the last letter. A letter shows up to where the next one starts (Avenir Heavy caps overhang their
