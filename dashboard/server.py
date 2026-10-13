@@ -38,6 +38,22 @@ def spawn(p, *args):
     RUNNING[p] = subprocess.Popen(["python3", str(PIPE), str(p), *args], stdout=log, stderr=log, stdin=subprocess.DEVNULL)
     return True
 
+LIB = Path.home() / "Projects" / "Reels" / "_library"
+VIDS, IMGS = {".mp4", ".mov", ".m4v"}, {".jpg", ".jpeg", ".png"}
+
+def lines(p):
+    """the transcript as short lines [{start, end, text}] — a new line at a sentence/clause end (5+ words), 14 words, or a pause"""
+    cfg = jload(p / "project.json", {})
+    tj = p / "work" / (Path(cfg.get("video", "x")).stem + ".json")
+    words = sorted((w for s in jload(tj, {}).get("segments", []) for w in s.get("words", [])), key=lambda w: w["start"])
+    out, cur = [], []
+    for i, w in enumerate(words):
+        cur.append(w); nxt = words[i + 1] if i + 1 < len(words) else None
+        txt = w["word"].strip()
+        if not nxt or len(cur) >= 14 or (len(cur) >= 5 and txt[-1:] in ".,?!;:") or nxt["start"] - w["end"] > 0.8:
+            out.append({"start": round(cur[0]["start"], 2), "end": round(cur[-1]["end"], 2), "text": " ".join(x["word"].strip() for x in cur)}); cur = []
+    return out
+
 def detail(pid, p):
     cfg = jload(p / "project.json", {})
     st = jload(p / "status.json", {"state": "idle"})
@@ -95,6 +111,15 @@ class H(BaseHTTPRequestHandler):
                             "videos": len(list((p / "out").glob("*.mp4"))) if (p / "out").exists() else 0,
                             "mtime": (p / "project.json").stat().st_mtime})
             return self.send(200, sorted(out, key=lambda x: -x["mtime"]))
+        if parts[:2] == ["api", "library"]:    # your B-roll library, for the drag tray
+            return self.send(200, [{"name": f.name, "path": str(f), "video": f.suffix.lower() in VIDS}
+                                   for f in sorted(LIB.iterdir()) if f.suffix.lower() in VIDS | IMGS] if LIB.is_dir() else [])
+        if parts[0] == "lib" and len(parts) == 2:
+            f = (LIB / parts[1]).resolve()
+            return self.file(f) if f.parent == LIB.resolve() and f.is_file() else self.send(404, {"error": "no file"})
+        if parts[0] == "api" and len(parts) == 4 and parts[1] == "p" and parts[3] == "lines":
+            p = projects().get(parts[2])
+            return self.send(200, lines(p)) if p else self.send(404, {"error": "no project"})
         if parts[0] == "api" and len(parts) >= 3 and parts[1] == "p":
             p = projects().get(parts[2])
             return self.send(200, detail(parts[2], p)) if p else self.send(404, {"error": "no project"})
@@ -143,6 +168,8 @@ class H(BaseHTTPRequestHandler):
                 if not chunk: break
                 fh.write(chunk); n -= len(chunk)
         cfg = jload(p / "project.json", {})
+        if q.get("kind", ["shot"])[0] == "broll":          # hand-placed B-roll: just store it, the drop says where it goes
+            return self.send(200, {"ok": True, "path": f"source/{name}"})
         if q.get("kind", ["shot"])[0] == "video":
             cfg["video"] = f"source/{name}"; cfg["reels"] = []
         else:
@@ -188,6 +215,16 @@ class H(BaseHTTPRequestHandler):
             if (data.get("note") or "").strip(): pre.setdefault("notes", []).append(time.strftime("%Y-%m-%d: ") + data["note"].strip())
             json.dump(pre, open(pp, "w"), indent=1, ensure_ascii=False); pp.open("a").write("\n")
             return self.send(200, {"ok": True, "preset": pp.stem})
+        if act in ("broll_add", "broll_del"):   # {path, start, end} | {i}: B-roll dragged onto a transcript line
+            mb = cfg.setdefault("manual_broll", [])
+            if act == "broll_add": mb.append({"path": data["path"], "start": float(data["start"]), "end": float(data["end"])}); t0 = float(data["start"])
+            else: t0 = mb.pop(int(data["i"]))["start"] if 0 <= int(data["i"]) < len(mb) else None
+            save()
+            if t0 is not None:            # re-render only the videos that cover that moment
+                for n in ["full"] + [r["name"] for r in cfg.get("reels", [])]:
+                    w = next((r.get("window", "") for r in cfg.get("reels", []) if r["name"] == n), "")
+                    if not w or float(w.split("-")[0]) <= t0 <= float(w.split("-")[1]): stale(n)
+            return self.send(200, {"ok": True})
         if act == "reel":                 # {name, on?, tag?}
             for r in cfg.get("reels", []):
                 if r["name"] == data.get("name"):

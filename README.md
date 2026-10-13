@@ -53,6 +53,12 @@ strongest word in red, a red serif quote mark, "— ADAM ROBERTS", Adam in the c
 phrase the news bars didn't use, one per video. Stat card: the number + unit said most often ("24 HOURS",
 "two hours" -> 2 HOURS) as a huge red number. Captions hide while a card is up (the card shows the words).
 
+**B-roll by hand (Oct 12 2026).** Dashboard section 4 shows the transcript as short lines and your library as
+thumbnails. Drag a thumbnail (or a file from Finder) onto a line: it plays while that line is said (at least
+2.5s), beats every automatic pick, and only the videos covering that moment re-render. ✕ removes it.
+Stored as `manual_broll` [{path, start, end}] in project.json; pipeline passes it to autoplan `--manual`.
+Photos get the Ken Burns rotation; clips go picture-in-picture.
+
 ## Pieces
 
 | file | job |

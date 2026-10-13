@@ -6,6 +6,7 @@ autoplan.py — plan a reel's on-screen graphics automatically from its transcri
       [--shots img1 img2 ...] [--off off.json] [--no-stock] [--plan plan.json]
 
 Plans, in priority order (later items never overlap earlier ones):
+  0. hand-placed      --manual: B-roll you dragged onto a transcript line in the dashboard (always on)
   1. screenshot cards  (--shots): OCR'd, set on cards, strongest lines highlighted; split screen for text,
                         full screen + bubble for a title/cover image. Anchored at the first mention of a
                         registry person named on the screenshot, else the first "substack/piece/wrote..." word.
@@ -40,7 +41,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("transcript"); ap.add_argument("--cuts", required=True)
     ap.add_argument("--work", required=True); ap.add_argument("--out", required=True)
-    ap.add_argument("--plan"); ap.add_argument("--off")
+    ap.add_argument("--plan"); ap.add_argument("--off"); ap.add_argument("--manual", help="hand-placed B-roll [{path, start, end}] (source time)")
     ap.add_argument("--shots", nargs="*", default=[]); ap.add_argument("--no-stock", action="store_true")
     ap.add_argument("--avoid", nargs="*", default=[], help="text that must never appear on a screenshot card (e.g. a wrong date)")
     a = ap.parse_args()
@@ -75,6 +76,15 @@ def main():
         if not item["on"] and item["id"] not in off: item["why"] += " (skipped: overlaps)"
         plan.append(item)
         if item["on"]: taken.append((s, e))
+
+    # 0. hand-placed B-roll (dragged onto a transcript line) beats everything automatic
+    for k, m in enumerate(load(a.manual, []) if a.manual else []):
+        if not inside(m["start"]) or not Path(m["path"]).exists(): continue
+        s, e = m["start"], min(max(m["end"], m["start"] + 2.5), end_of(m["start"]))
+        item = {"id": f"hand:{k}:{Path(m['path']).name}", "type": "broll", "why": f"you placed {Path(m['path']).name} here"}
+        if Path(m["path"]).suffix.lower() in VIDS: item.update(video=m["path"], layout="pip")
+        else: item.update(image=m["path"], kb=next(KB))
+        add(item, s, e, force=True)
 
     # 1. screenshots
     if a.shots:

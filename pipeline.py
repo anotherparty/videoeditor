@@ -101,8 +101,10 @@ class Run:
         self.sh(["python3", HERE / "makecaptions.py", tj, "--cuts", cuts, "--max-words", mw, "--max-chars", mc, "--out", self.work / f"{name}.cues.json"])
         self.say("planning graphics", name)
         shots = [str(self.p / s) for s in self.cfg.get("shots", [])]
+        manual = self.work / "manual_broll.json"      # B-roll dragged onto transcript lines in the dashboard
+        json.dump([{**m, "path": str(self.p / m["path"])} for m in self.cfg.get("manual_broll", [])], open(manual, "w"))
         self.sh(["python3", HERE / "autoplan.py", tj, "--cuts", cuts, "--work", self.work / "auto", "--out", self.work / f"{name}.beats.json",
-                 "--plan", self.work / f"{name}.plan.json", "--off", self.work / f"{name}.off.json", *(["--shots", *shots] if shots else []),
+                 "--plan", self.work / f"{name}.plan.json", "--off", self.work / f"{name}.off.json", "--manual", manual, *(["--shots", *shots] if shots else []),
                  *(["--avoid", *self.cfg["shot_avoid"]] if self.cfg.get("shot_avoid") else [])])
         self.sh(["python3", HERE / "editplan.py", tj, "--cuts", cuts, self.work / f"{name}.beats.json", "--out", self.work / f"{name}.edit.json"])
         if plan_only: return
