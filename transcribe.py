@@ -12,6 +12,8 @@ venv's python:
 Writes two files next to each other in --out-dir (default ./transcripts):
   <stem>.txt   human-readable, [mm:ss] per segment  -> for marking cuts
   <stem>.json  {segments:[{start,end,text,words:[{start,end,word}]}]}  -> caption timing
+  <stem>.env.json  {hop, db:[...]} loudness every 10 ms -> deadair.py puts filler cuts in real silence
+  (--env-only writes just that, for a transcript made before it existed)
 """
 import argparse, json, os, sys
 from pathlib import Path
@@ -21,12 +23,21 @@ def ts(sec: float) -> str:
     m, s = divmod(int(round(sec)), 60)
     return f"{m:02d}:{s:02d}"
 
+def write_env(src, out):
+    """loudness envelope (dBFS per 10 ms) so cuts next to a dropped um can land in real silence"""
+    import numpy as np
+    from faster_whisper import decode_audio
+    x = decode_audio(str(src), sampling_rate=16000); n = len(x) // 160
+    db = 20 * np.log10(np.sqrt((x[:n * 160].reshape(n, 160) ** 2).mean(axis=1)) + 1e-9)
+    out.write_text(json.dumps({"hop": 0.01, "db": [int(round(v)) for v in db]}))
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("input")
     ap.add_argument("--model", default="base.en")
     ap.add_argument("--out-dir", default=str(Path(__file__).parent / "transcripts"))
     ap.add_argument("--fillers", action="store_true", help="keep um/uh/false starts in the transcript so they can be cut")
+    ap.add_argument("--env-only", action="store_true", help="just write <stem>.env.json")
     a = ap.parse_args()
 
     src = Path(a.input).expanduser()
@@ -34,6 +45,8 @@ def main() -> int:
         print(f"ERROR: input not found: {src}", file=sys.stderr); return 1
     out_dir = Path(a.out_dir).expanduser(); out_dir.mkdir(parents=True, exist_ok=True)
     stem = src.stem
+    write_env(src, out_dir / f"{stem}.env.json")
+    if a.env_only: return 0
 
     from faster_whisper import WhisperModel
     print(f"[transcribe] loading model {a.model} (int8)…", flush=True)

@@ -235,9 +235,10 @@ async function refresh(full){
 
 function render(){
   const d=data,c=d.cfg,st=d.status||{};
-  const state=d.running?'running':(st.state||'idle');
+  const stale=(d.outputs||[]).some(o=>o.on&&!o.url);              // a setting change sent a video back for re-render
+  const state=d.running?'running':st.state==='done'&&stale?'stale':(st.state||'idle');
   const pill=`<span class="pill ${state.startsWith('done')?'done':state.startsWith('preview')?'preview':state}"><span class="dot"></span>${
-    d.running?`${esc(st.job||'')} ${esc(st.step||'working')}`:state==='done'?'All videos ready':esc(state)}</span>`;
+    d.running?`${esc(st.job||'')} ${esc(st.step||'working')}`:state==='done'?'All videos ready':state==='stale'?'Needs a re-render':esc(state)}</span>`;
   const shots=(c.shots||[]).map(s=>`<img src="/files/${d.id}/${encodeURI(s)}" title="${esc(s)}">`).join('');
   const sug=(d.suggestions||[]).map(s=>`<button class="chip" data-sug="${esc(s)}">${esc(s)}</button>`).join('');
   $('#main').innerHTML=`

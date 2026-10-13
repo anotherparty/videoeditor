@@ -9,13 +9,17 @@ deadair.py — turn a word-level transcript into a --cuts list that drops dead a
 - --within restricts to one source window (for pulling a short reel out of a long take).
 - Presets: natural = --gap 0.7, tight = --gap 0.35, light = --gap 1.5.
 - --drop-fillers cuts um/uh/ah/er/hmm (needs a transcribe.py --fillers transcript);
-  --drop-repeats also cuts stutters and doubled words ("I- I", "the the"). Cuts next to a dropped word get a tiny pad.
+  --drop-repeats also cuts stutters and doubled words ("I- I", "the the"). Whisper's word edges are often 0.1-0.3 s off,
+  so a cut next to a dropped word snaps into real silence using <transcript>.env.json (transcribe.py writes it):
+  the first quiet stretch after the word before, the last one before the word after; else the quietest 10 ms.
 Prints the cut string (feed straight to makecaptions.py / stagereel.swift --cuts) and,
 on stderr, how much time was removed.
 """
 import argparse, json, sys
+from pathlib import Path
 
 FILLERS = {"um", "uh", "umm", "uhh", "uhm", "ah", "er", "erm", "hmm", "mm"}
+DOUBLES = {"sing", "had", "that", "is", "walla", "bora"}     # real doubled words ("Sing Sing", "had had"): never a stutter
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -40,26 +44,48 @@ def main() -> int:
     for i, w in enumerate(words):
         n = norm(w)
         if a.drop_fillers and n in FILLERS: drop[i] = True
-        if a.drop_repeats and (n.endswith("-") or (i + 1 < len(words) and n and n == norm(words[i + 1]))): drop[i] = True
+        if a.drop_repeats and (n.endswith("-") or (i + 1 < len(words) and n and n == norm(words[i + 1]) and n not in DOUBLES)): drop[i] = True
     dropped = sum(drop)
 
-    ranges = []          # (start, end, start_touches_a_drop, end_touches_a_drop)
+    ranges = []          # (start, end, gap to a dropped word before start | None, gap to a dropped word after end | None)
     cur = None
     for i, w in enumerate(words):
         if drop[i]:
-            if cur: ranges.append((cur[0], cur[1], cur[2], True)); cur = None
+            if cur: ranges.append((cur[0], cur[1], cur[2], w["start"] - cur[1])); cur = None
             continue
-        after_drop = i > 0 and drop[i - 1]
+        after_drop = w["start"] - words[i - 1]["end"] if i > 0 and drop[i - 1] else None
         if cur and w["start"] - cur[1] <= a.gap: cur[1] = max(cur[1], w["end"])
         else:
-            if cur: ranges.append((cur[0], cur[1], cur[2], False))
+            if cur: ranges.append((cur[0], cur[1], cur[2], None))
             cur = [w["start"], w["end"], after_drop]
-    if cur: ranges.append((cur[0], cur[1], cur[2], False))
+    if cur: ranges.append((cur[0], cur[1], cur[2], None))
+
+    ev = Path(a.transcript).with_suffix(".env.json"); env = json.load(open(ev)) if ev.exists() else None
+    if env: hop, db = env["hop"], env["db"]; quiet = sorted(db)[len(db) // 10] + 8     # room tone + 8 dB counts as silence
+    def snap(t0, t1, after):
+        """cut point in [t0, t1]: inside the quiet stretch nearest the kept word (after=True: word is before t0)"""
+        i0, i1 = max(0, int(t0 / hop)), min(len(db), int(t1 / hop))
+        if i1 - i0 < 2: return None
+        runs, r0 = [], None                                      # quiet stretches of 40 ms+ as (first, last) frame
+        for i in range(i0, i1 + 1):
+            q = i < i1 and db[i] <= quiet
+            if q and r0 is None: r0 = i
+            if not q and r0 is not None:
+                if i - r0 >= 4: runs.append((r0, i - 1))
+                r0 = None
+        if not runs: return (min(range(i0, i1), key=lambda i: db[i]) + 0.5) * hop
+        q0, q1 = runs[0] if after else runs[-1]; q0, q1 = q0 * hop, (q1 + 1) * hop; b = min(a.pad, (q1 - q0) / 2)
+        return q0 + b if after else q1 - b
 
     # pad, clamp, and merge anything the padding made touch
     out = []
     for s, e, sd, ed in ranges:
-        s, e = max(lo, s - (0.03 if sd else a.pad)), min(hi, e + (0.03 if ed else a.pad))
+        # next to a dropped word: snap into real silence (env), else the full breath pad where the gap allows
+        pd = lambda g: a.pad if g is None else min(a.pad, max(0.0, g) + 0.03)
+        s0, e0 = s - pd(sd), e + pd(ed)
+        if env and ed is not None: e0 = snap(e, max(e + a.pad, e + ed + 0.03), True) or e0
+        if env and sd is not None: s0 = snap(min(s - a.pad, s - sd - 0.03), s, False) or s0
+        s, e = max(lo, s0), min(hi, e0)
         if out and s <= out[-1][1]:
             out[-1] = (out[-1][0], e)
         else:

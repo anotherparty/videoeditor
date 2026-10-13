@@ -106,6 +106,15 @@ private), editable caption + hashtags (registry/accounts.json default set for @a
   ruthless (shorter pauses + stutters and doubled words). transcribe.py --fillers makes Whisper write the ums down
   (one-year: 0 -> 6 found); deadair.py --drop-fillers/--drop-repeats cuts them. The Look section shows seconds each
   option cuts (one-year: 37 / 42.5 / 47.6 s of 3:33). Changing it re-cuts every video; the look stays approved.
+  Render-tested Oct 13 2026 (full one-year video on clean and ruthless): captions showed "uh," / "Um," (the dropped
+  word's start fell inside the 0.03 pad) and ruthless cut "Sing Sing" to "Sing". Fixed: makecaptions.py never shows
+  um/uh in any mode (nor a cut word whose middle is outside the kept range); real doubles (Sing Sing, had had) are never
+  stutters; Whisper's filler edges were 0.1-0.3 s off and the 0.03 pad clipped "painting" mid-word (cut at -26 dB),
+  so transcribe.py now writes `<video>.env.json` (loudness every 10 ms; `--env-only` for older transcripts, the
+  pipeline adds it when missing) and deadair.py snaps each cut next to a dropped word into the nearest real silence.
+  Every filler cut now lands at -47..-55 dB source level except where speech runs straight through (Freeman-uh-as:
+  the quietest dip, -36). Clean cuts 41 s, ruthless 46 s; both measure peak -0.9 / RMS -17.3 dBFS. The status pill
+  says "Needs a re-render" (not "All videos ready") after a setting change sends a video back.
 - ✋ Drop B-roll on the timeline (Oct 12 2026): a Wide video card has a library tray above its timeline. Drag a thumb
   (or a Finder file) onto the timeline: the drop's x position becomes the transcript time (3.8 s long) and is saved as
   hand-placed B-roll (`manual_broll`, same as a transcript-line drop). It shows as a dashed block until the next render.

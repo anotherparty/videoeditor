@@ -15,6 +15,7 @@ Output: [{"start","end","text","words":[{start,end,text}]}, ...] (words = karaok
 """
 import argparse, json, re, sys
 from pathlib import Path
+from deadair import FILLERS     # um/uh never shown
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -46,7 +47,9 @@ def main() -> int:
     kept = []  # (out_start, out_end, text)
     offset = 0.0
     for (lo, hi) in ranges:
-        seg_words = [w for w in words if lo <= w["start"] < hi]
+        # never caption an um/uh (light keeps them in the audio), nor a cut word whose start the pad let in
+        seg_words = [w for w in words if lo <= w["start"] < hi and (w["start"] + w["end"]) / 2 < hi
+                     and w["word"].strip(" ,.?!;:\"").lower() not in FILLERS]
         for w in seg_words:
             os_ = (w["start"] - lo) + offset
             oe_ = (min(w["end"], hi) - lo) + offset

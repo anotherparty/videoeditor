@@ -75,6 +75,8 @@ class Run:
         if not tj.exists():
             self.say("transcribing (a minute or two)")
             self.sh([VENV_PY, HERE / "transcribe.py", src, "--model", "small.en", "--out-dir", self.work, "--fillers"])
+        if not tj.with_suffix(".env.json").exists():                                      # loudness map: um cuts land in silence
+            self.sh([VENV_PY, HERE / "transcribe.py", src, "--out-dir", self.work, "--env-only"])
         return tj
 
     def edit(self): return self.cfg.get("edit") if self.cfg.get("edit") in EDITS else "clean"
