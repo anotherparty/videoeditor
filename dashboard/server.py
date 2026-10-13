@@ -498,10 +498,19 @@ class H(BaseHTTPRequestHandler):
             if job.get("state") == "posting": return self.send(200, {"error": "already posting this one"})
             plats = [x for x in data.get("platforms", []) if x in ("youtube", "instagram")]
             if not plats: return self.send(200, {"error": "pick YouTube and/or Instagram"})
+            if not (p / "out" / f"{data['video']}.mp4").exists():   # an edit (switch, drag, tag) set the finished video aside until a re-render
+                if (p / "out" / "_prev" / f"{data['video']}.mp4").exists():
+                    return self.send(200, {"error": "You changed this video after it finished (a switch, drag or tag), so it's waiting for a re-render.", "restore": True})
+                return self.send(200, {"error": "This video isn't rendered yet."})
             cfg.setdefault("post_jobs", {})[data["video"]] = {"state": "posting", "detail": "starting…", "when": time.strftime("%Y-%m-%d %H:%M"), "platforms": plats}; save()
             subprocess.Popen(["python3", str(HERE.parent / "posting.py"), str(p), data["video"], "--platforms", *plats],
                              stdout=open(p / "work" / "posting.log", "a"), stderr=subprocess.STDOUT, start_new_session=True)
             return self.send(200, {"started": True})
+        if act == "restore":              # {video} -> put the last finished render back (Adam would rather post it than re-render)
+            for x in (p / "out" / "_prev" / f"{data['video']}.mp4", p / "out" / "_prev" / "phone" / f"{data['video']}.mp4"):
+                dest = p / "out" / x.relative_to(p / "out" / "_prev")
+                if x.exists() and not dest.exists(): dest.parent.mkdir(parents=True, exist_ok=True); os.replace(x, dest)
+            return self.send(200, {"ok": (p / "out" / f"{data['video']}.mp4").exists()})
         if act == "caption":              # {video} -> Claude writes caption + hashtags + alt text in Adam's voice
             out = write_caption(p, data["video"])
             if "error" in out: return self.send(200, out)

@@ -478,7 +478,9 @@ function posts(){
   document.querySelectorAll('[data-publish]').forEach(b=>b.onclick=async()=>{const n=b.dataset.publish, plats=b.dataset.plats.split(',');
     const names=plats.map(k=>({youtube:'YouTube',instagram:'Instagram @anotherparty25'})[k]).join(' and ');
     if(!confirm(`Post "${n}" to ${names} now?\n\nClaude will upload it in your Chrome with this caption and cover. This goes public.`))return;
-    b.disabled=true; const r=await post(`/api/p/${cur}/publish`,{video:n,platforms:plats}); if(r.error)alert(r.error); refresh(true)});
+    b.disabled=true; let r=await post(`/api/p/${cur}/publish`,{video:n,platforms:plats});
+    if(r.restore&&confirm(r.error+'\n\nPost the last finished version instead? (Your change stays saved for the next render.)')){await post(`/api/p/${cur}/restore`,{video:n}); r=await post(`/api/p/${cur}/publish`,{video:n,platforms:plats});}
+    if(r.error&&!r.restore)alert(r.error); refresh(true)});
   document.querySelectorAll('[data-savetags]').forEach(b=>b.onclick=async()=>{const v=b.closest('.postp').querySelector('[data-pf=tags]').value;
     await fetch('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:'@anotherparty25',hashtags:v})});
     ACC['@anotherparty25']={hashtags:v};b.textContent='✓ Saved'});
