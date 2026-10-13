@@ -17,7 +17,7 @@ Plans, in priority order (later items never overlap earlier ones):
 Writes beats.json (source-time beats for editplan.py) and plan.json (every candidate, with id/why/on —
 the dashboard shows it and writes off.json to switch items off). Prints UNKNOWN NAMES for the registry.
 """
-import argparse, json, os, re, subprocess, sys, urllib.parse, urllib.request
+import argparse, itertools, json, os, re, subprocess, sys, urllib.parse, urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -148,8 +148,8 @@ def main():
         if not hit: continue
         s = words[hit[0]]["start"]; e = min(s + 3.8, end_of(s))
         item = {"id": f"lib:{lf.name}", "type": "broll", "why": f"'{' '.join(toks[hit[0]:hit[0] + hit[1]])}' -> your library {lf.name}"}
-        if lf.suffix.lower() in VIDS: item.update(video=str(lf))
-        else: item.update(image=str(lf), kb="in")
+        if lf.suffix.lower() in VIDS: item.update(video=str(lf), layout="pip")    # your clip full screen, you in a framed corner box
+        else: item.update(image=str(lf), kb=next(KB))
         add(item, s, e)
 
     # 4/5. places: year nearby -> place card; else stock query -> B-roll
@@ -169,7 +169,7 @@ def main():
             if not media: continue
             item = {"id": f"stock:{pl['stock']}", "why": f"'{' '.join(pl['keys'][:1])}' -> Pixabay '{pl['stock']}'", "type": "broll"}
             if media.endswith(".mp4"): item.update(video=media)
-            else: item.update(image=media, label="FILE PHOTO", kb="in")
+            else: item.update(image=media, label="FILE PHOTO", kb=next(KB))
             add(item, s, e)
         elif pl.get("name"):
             add({"id": f"place:{pl['name']}", "type": "place", "place": pl["name"], "year": "",
@@ -205,6 +205,7 @@ def fetch(url, out=None):
     if out: open(out, "wb").write(data)
     return data
 
+KB = itertools.cycle(["in", "left", "out", "right"])   # Ken Burns: photos take turns zooming and panning
 LIB = Path.home() / "Projects" / "Reels" / "_library"
 VIDS = {".mp4", ".mov", ".m4v"}
 LIB_SKIP = {"img", "photo", "video", "clip", "final", "copy", "edit", "the", "and", "with", "from", "for"}

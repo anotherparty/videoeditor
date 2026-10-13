@@ -98,8 +98,8 @@ struct Punch { let start: Double; let end: Double; let zoom: CGFloat; let focus:
 struct Broll { let image: String?; let color: String?; let start: Double; let end: Double
                let bubble: String; let label: String?; let kb: String
                var marks: [[String: Any]] = []    // highlighter patches from brollcard.swift, each with "start"
-               var layout: String = "full"        // full (cutaway + bubble) | split (image top half, Adam bottom half)
-               var video: String? = nil }         // stock video clip: always split (the bubble can't show a second video)
+               var layout: String = "full"        // full (cutaway + bubble) | split (image top half, Adam bottom half) | pip (video only)
+               var video: String? = nil }         // video clip: split, or pip = clip full screen + Adam shrunk into a framed corner box
 var PUNCHES: [Punch] = [], BROLLS: [Broll] = [], GRAPHICS: [[String:Any]] = [], NOCAPS: [(Double,Double)] = []
 if let ep = arg("--edit") {
     guard let data = FileManager.default.contents(atPath: ep),
@@ -113,7 +113,7 @@ if let ep = arg("--edit") {
         BROLLS.append(Broll(image: b["image"] as? String, color: b["color"] as? String,
                             start: b["start"] as! Double, end: b["end"] as! Double,
                             bubble: b["bubble"] as? String ?? "br", label: b["label"] as? String, kb: b["kb"] as? String ?? "in",
-                            marks: b["marks"] as? [[String: Any]] ?? [], layout: b["video"] != nil ? "split" : (b["layout"] as? String ?? "full"),
+                            marks: b["marks"] as? [[String: Any]] ?? [], layout: b["video"] != nil ? (b["layout"] as? String == "pip" ? "pip" : "split") : (b["layout"] as? String ?? "full"),
                             video: b["video"] as? String))
     }
     GRAPHICS = (o["graphics"] as? [[String:Any]]) ?? []
@@ -622,8 +622,16 @@ func makeBroll(_ b: Broll, total: Double) -> CALayer {
     if let c = b.color { box.backgroundColor = hexColor(c).cgColor }
     if let path = b.image, let im = NSImage(contentsOfFile: path), let cg = im.cgImage(forProposedRect: nil, context: nil, hints: nil) {
         let pic = CALayer(); pic.frame = box.bounds; pic.contents = cg; pic.contentsGravity = .resizeAspectFill
-        let kb = CABasicAnimation(keyPath: "transform.scale")
-        kb.fromValue = b.kb == "out" ? 1.14 : 1.0; kb.toValue = b.kb == "out" ? 1.0 : (b.kb == "none" ? 1.0 : 1.14)
+        let pan = ["left", "right", "up", "down"].contains(b.kb), d = box.bounds.width * 0.06   // pans: zoomed 1.14, drift across
+        let kb = CABasicAnimation(keyPath: pan ? "position" : "transform.scale")
+        if pan {
+            pic.transform = CATransform3DMakeScale(1.14, 1.14, 1); let c = CGPoint(x: box.bounds.midX, y: box.bounds.midY)
+            let off: (CGFloat, CGFloat) = b.kb == "left" ? (d, 0) : b.kb == "right" ? (-d, 0) : b.kb == "up" ? (0, -d) : (0, d)
+            kb.fromValue = NSValue(point: CGPoint(x: c.x + off.0, y: c.y + off.1)); kb.toValue = NSValue(point: CGPoint(x: c.x - off.0, y: c.y - off.1))
+            kb.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        } else {
+            kb.fromValue = b.kb == "out" ? 1.14 : 1.0; kb.toValue = b.kb == "out" ? 1.0 : (b.kb == "none" ? 1.0 : 1.14)
+        }
         kb.beginTime = AVCoreAnimationBeginTimeAtZero + b.start; kb.duration = max(0.1, b.end - b.start)
         kb.fillMode = .both; kb.isRemovedOnCompletion = false
         pic.add(kb, forKey: "kb"); box.addSublayer(pic)
@@ -661,6 +669,8 @@ func makeBroll(_ b: Broll, total: Double) -> CALayer {
     return box
 }
 let BUBBLE_D: CGFloat = CGFloat(W) * 0.36
+let PIP_K: CGFloat = 0.34                 // PiP: Adam's whole frame at 34% size, bottom-right, above the captions
+var PIP_WINDOWS: [(Double, Double)] = []
 let BUBBLE_BOTTOM: CGFloat = CGFloat(H) * 0.15 + BTB_LINE * 2 + 34     // clear of a 2-line caption block
 // Adam in a circle: a second video layer (same composited frame), scaled + offset so his face
 // sits in the circle, masked round, white ring. Returns (wrapper, videoLayer).
@@ -915,7 +925,7 @@ func compose() {
         if HAS_ENDCARD { li.setTransform(.identity, at: contentDur) }
         // stock video B-roll: a second track filling the top half, shown only inside its window
         var layerInsts: [AVMutableVideoCompositionLayerInstruction] = [li]
-        let vbs = BROLLS.filter { $0.video != nil }
+        let vbs = BROLLS.filter { $0.video != nil && $0.layout == "split" }
         if !vbs.isEmpty, let bTrack = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
             let lb = AVMutableVideoCompositionLayerInstruction(assetTrack: bTrack)
             lb.setOpacity(0, at: .zero)
@@ -941,6 +951,38 @@ func compose() {
             }
             layerInsts.insert(lb, at: 0)
         }
+        // PiP: the clip fills the frame on a track UNDER Adam; Adam's video shrinks into a box bottom-right, then grows back
+        let pbs = BROLLS.filter { $0.video != nil && $0.layout == "pip" }
+        if !pbs.isEmpty, let pTrack = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            let lp = AVMutableVideoCompositionLayerInstruction(assetTrack: pTrack)
+            lp.setOpacity(0, at: .zero)
+            let pw = CGFloat(W) * PIP_K, ph = CGFloat(H) * PIP_K, ramp = 0.25
+            let small = vt.concatenating(CGAffineTransform(scaleX: PIP_K, y: PIP_K))
+                          .concatenating(CGAffineTransform(translationX: CGFloat(W) - 26 - pw, y: CGFloat(H) - BUBBLE_BOTTOM - ph))
+            for b in pbs {
+                let a = AVURLAsset(url: URL(fileURLWithPath: b.video!))
+                guard let t = try? await a.loadTracks(withMediaType: .video).first,
+                      let nat = try? await t.load(.naturalSize), let pt = try? await t.load(.preferredTransform),
+                      let dur = try? await a.load(.duration) else {
+                    FileHandle.standardError.write("pip video load failed: \(b.video!)\n".data(using: .utf8)!); continue }
+                let len = min(b.end - b.start, dur.seconds, contentDur.seconds - b.start); if len < 0.8 { continue }
+                let at = CMTime(seconds: b.start, preferredTimescale: TS)
+                try? pTrack.insertTimeRange(CMTimeRange(start: .zero, duration: CMTime(seconds: len, preferredTimescale: TS)), of: t, at: at)
+                let sz = nat.applying(pt); let sw = abs(sz.width), sh = abs(sz.height)
+                let k = max(CGFloat(W) / sw, CGFloat(H) / sh)
+                lp.setTransform(pt.concatenating(CGAffineTransform(scaleX: k, y: k))
+                                  .concatenating(CGAffineTransform(translationX: (CGFloat(W) - sw * k) / 2, y: (CGFloat(H) - sh * k) / 2)), at: at)
+                lp.setOpacity(1, at: at); lp.setOpacity(0, at: CMTime(seconds: b.start + len, preferredTimescale: TS))
+                let tm = { (s: Double) in CMTime(seconds: s, preferredTimescale: TS) }
+                li.setTransformRamp(fromStart: vt, toEnd: small, timeRange: CMTimeRange(start: at, duration: tm(ramp)))
+                li.setTransform(small, at: tm(b.start + ramp))
+                let e0 = b.start + len - ramp
+                li.setTransformRamp(fromStart: small, toEnd: vt, timeRange: CMTimeRange(start: tm(e0), duration: tm(ramp)))
+                li.setTransform(vt, at: tm(e0 + ramp))
+                PIP_WINDOWS.append((b.start, b.start + len))
+            }
+            layerInsts.append(lp)
+        }
         inst.layerInstructions = layerInsts; vc.instructions = [inst]
 
         // overlay layer tree
@@ -954,9 +996,16 @@ func compose() {
         var videoLayers = [videoLayer]
         // B-roll cutaways, Adam's bubble over them, then animated graphics
         for b in BROLLS where b.video == nil { parent.addSublayer(makeBroll(b, total: totalS)) }
-        for b in BROLLS where b.bubble != "none" && b.layout != "split" {
+        for b in BROLLS where b.bubble != "none" && b.layout != "split" && b.video == nil {
             let (wrap, vid) = makeBubble(b, face: face, total: totalS)
             parent.addSublayer(wrap); videoLayers.append(vid)
+        }
+        for (s, e) in PIP_WINDOWS {          // cream frame + shadow around Adam's PiP box (appears once he's shrunk)
+            let pw = CGFloat(W) * PIP_K, ph = CGFloat(H) * PIP_K, bw: CGFloat = 8
+            let fr = CALayer(); fr.frame = CGRect(x: CGFloat(W) - 26 - pw - bw, y: BUBBLE_BOTTOM - bw, width: pw + 2 * bw, height: ph + 2 * bw)
+            fr.borderWidth = bw; fr.borderColor = cream.cgColor; fr.cornerRadius = bw
+            fr.shadowColor = NSColor.black.cgColor; fr.shadowOpacity = 0.5; fr.shadowRadius = 16; fr.shadowOffset = CGSize(width: 0, height: -5)
+            addFadeWindow(fr, showStart: s + 0.25, showEnd: e - 0.25, total: totalS, fade: 0.08); parent.addSublayer(fr)
         }
         for g in GRAPHICS { for l in makeGraphics(g, total: totalS, contentDur: contentS) { parent.addSublayer(l) } }
 

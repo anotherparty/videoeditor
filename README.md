@@ -38,6 +38,11 @@ For other trigger words, add `library.json`: `{"lexi-couch.jpg": ["Lexi", "my do
 Re-pick/Render to pick up new files. Next B-roll steps: Ken Burns + PiP, quote/stat cards, archival
 stills, drag-onto-a-transcript-line.
 
+**Ken Burns + PiP (Oct 12 2026).** Photos take turns: zoom in, pan left, zoom out, pan right (`kb`:
+in|out|left|right|up|down|none). Video B-roll can be `"layout": "pip"`: the clip fills the screen and Adam's
+whole frame slides into a cream-framed box bottom-right (34% size, above the captions), then grows back.
+Library clips default to PiP; Pixabay clips stay split screen. Next: news-style lower thirds, quote/stat cards.
+
 ## Pieces
 
 | file | job |
