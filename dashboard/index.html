@@ -9,6 +9,7 @@
   --bg:#f7f1e6; --panel:#fffdf8; --ink:#1d1a17; --muted:#6f665c; --line:#e5dccd;
   --red:#b22e26; --mint:#33f2c7; --purple:#8c2ef2; --ok:#1f8a5b; --warn:#b7791f;
   --label:#2f6fdb; --place:#c2410c; --emoji:#a16207; --broll:#7c3aed; --stock:#0f766e;
+  --lib:#be185d; --hand:#1d1a17; --news:#dc2626; --card:#0e7490;
   --r:14px; --shadow:0 1px 2px rgba(40,30,20,.06),0 4px 16px rgba(40,30,20,.06);
 }
 *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -74,7 +75,7 @@ label.f{display:block;font-size:12.5px;font-weight:650;color:var(--muted);margin
 .vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
 .vid{display:flex;flex-direction:column;gap:12px}
 .vid.wide{grid-column:1/-1}
-.wbtn{font-size:12px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 8px;cursor:pointer}
+.wbtn{white-space:nowrap;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 8px;cursor:pointer}
 .vid.off{opacity:.55}
 .vhead{display:flex;align-items:center;gap:8px}
 .vhead input{flex:1;font-weight:700;border:1px solid transparent;background:none;border-radius:8px;padding:4px 6px;margin-left:-6px}
@@ -127,6 +128,44 @@ a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center}
 .pill.preview{background:#ece0fb;color:var(--purple)}
 pre.log{background:#1d1a17;color:#e9e3d8;border-radius:12px;padding:12px 14px;font:12px/1.5 Menlo,monospace;white-space:pre-wrap;max-height:200px;overflow:auto;margin:0}
 .empty{color:var(--muted);text-align:center;padding:60px 20px}
+.steps{display:flex;gap:6px;margin:16px 0 4px;flex-wrap:wrap}
+.step{flex:1;min-width:120px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 12px;cursor:pointer;text-align:left}
+.step b{display:block;font-size:13.5px} .step small{color:var(--muted);font-size:12px}
+.step.done{border-color:#bfe6d3;background:#effaf4} .step.done b:before{content:"✓ ";color:var(--ok)}
+.step.now{border-color:var(--red);box-shadow:0 0 0 2px #f6d5d2}
+h2.sec{cursor:pointer;display:flex;gap:8px;align-items:baseline;user-select:none}
+h2.sec:before{content:"▾";font-size:11px} h2.sec.collapsed:before{content:"▸"}
+h2.sec small{text-transform:none;letter-spacing:0;font-weight:500;font-size:12.5px}
+h2.sec.collapsed + *{display:none}
+.phl{position:absolute;top:0;bottom:0;width:2px;background:var(--red);pointer-events:none;z-index:3;display:none}
+.nav{border-top:1px solid var(--line);margin-top:16px;padding-top:12px;display:flex;flex-direction:column;gap:2px}
+.nav button{border:0;background:none;text-align:left;padding:9px 12px;border-radius:10px;cursor:pointer;font-weight:600;display:flex;justify-content:space-between}
+.nav button:hover{background:#ebe1d0} .nav button.on{background:var(--ink);color:#fff}
+.nav small{opacity:.6;font-weight:500}
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px}
+.ins{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.ins .media{aspect-ratio:4/5;background:#1d1a17 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;text-align:center;padding:10px;position:relative}
+.ins .media video{width:100%;height:100%;object-fit:cover;border-radius:0;aspect-ratio:auto}
+.ins .media a{color:#fff}
+.ins .body{padding:10px 12px;display:flex;flex-direction:column;gap:7px;font-size:13px}
+.ins .ask{background:#fff8e6;border:1px solid #f1dfb0;border-radius:9px;padding:8px}
+.likes{display:flex;flex-wrap:wrap;gap:5px}
+.likes label{border:1px solid var(--line);border-radius:99px;padding:3px 9px;cursor:pointer;background:#fff;font-size:12px}
+.likes input{display:none} .likes input:checked+span{color:var(--red);font-weight:700}
+.likes label:has(input:checked){border-color:var(--red);background:#fff1ea}
+.ins textarea,.ins select{width:100%;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:13px inherit;background:#fff}
+.ins .x{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);border:0;color:#fff;border-radius:7px;padding:2px 7px;cursor:pointer}
+.addrow{display:flex;gap:8px;margin-top:12px}
+.addrow input{flex:1}
+.libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:14px}
+.lf{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.lf .m{aspect-ratio:1;background:#ece3d3 center/cover;display:flex;align-items:center;justify-content:center;font-size:28px}
+.lf input{width:100%;border:0;border-top:1px solid var(--line);padding:6px 8px;font-size:12px;background:#fff}
+.lf .row{display:flex;justify-content:space-between;padding:4px 8px;font-size:11px;color:var(--muted)}
+.lf .row a{color:var(--red);cursor:pointer}
+.hc{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}
+.hc .ic{font-size:18px;width:24px;text-align:center}
+.hc b{display:block} .hc small{color:var(--muted)}
 .err{color:var(--red);font-size:13px}
 @media (max-width:820px){.app{grid-template-columns:1fr} aside{position:static;height:auto} main{padding:18px 16px 60px} .grid2,.styles{grid-template-columns:1fr}}
 </style>
@@ -136,21 +175,34 @@ pre.log{background:#1d1a17;color:#e9e3d8;border-radius:12px;padding:12px 14px;fo
   <aside>
     <div class="brand"><b>Reel Studio</b><span>Another Party</span></div>
     <div id="plist"></div>
+    <div class="nav">
+      <button data-view="inspiration">✨ Inspiration <small id="nInsp"></small></button>
+      <button data-view="library">🎞 B-roll library <small id="nLib"></small></button>
+      <button data-view="health">🩺 Health check <small id="nHealth"></small></button>
+    </div>
     <form class="new" id="newf"><input id="newname" placeholder="New project name"><select id="newtype" title="Project type"></select><button class="btn small dark">Add</button></form>
   </aside>
   <main id="main"><div class="empty">Pick a project on the left, or start a new one.</div></main>
 </div>
 <script>
-const COLORS={label:'var(--label)',place:'var(--place)',emoji:'var(--emoji)',broll:'var(--broll)',stock:'var(--stock)'};
+const COLORS={label:'var(--label)',place:'var(--place)',emoji:'var(--emoji)',broll:'var(--broll)',stock:'var(--stock)',
+  lib:'var(--lib)',hand:'var(--hand)',news:'var(--news)',card:'var(--card)'};
+const KINDS={label:'Name label',place:'Place card',emoji:'Emoji',broll:'Screenshot',stock:'Stock footage',lib:'Your library',hand:'Placed by you',news:'News bar',card:'Quote / stat card'};
 const $=s=>document.querySelector(s);
-let cur=null, data=null, timer=null, editing=false;
+let cur=null, data=null, timer=null, editing=false, LASTSIG='', LASTVID=null;
+// spacebar plays / pauses the video you last played (unless you're typing)
+document.addEventListener('keydown',e=>{if(e.code!=='Space'||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;
+  const v=LASTVID&&document.body.contains(LASTVID)?LASTVID:document.querySelector('video[data-v]'); if(!v)return;
+  e.preventDefault(); v.paused?v.play():v.pause()});
 const api=(p,o={})=>fetch(p,{headers:{'Content-Type':'application/json'},...o}).then(r=>r.json());
 const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b||{})});
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const kind=it=>it.type==='broll'?(it.id.startsWith('stock')?'stock':'broll'):it.type;
+const kind=it=>{const p=String(it.id||'').split(':')[0];
+  return {stock:'stock',lib:'lib',hand:'hand',quote:'card',stat:'card',news:'news'}[p]||(it.type==='broll'?'broll':it.type)};
 const fmt=t=>{t=Math.max(0,t);return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0')};
 
 async function loadList(){
+  api('/api/inspiration').then(r=>$('#nInsp').textContent=r.items.length||'');
   const ps=await api('/api/projects');
   $('#plist').innerHTML=ps.map(p=>`<button class="proj ${p.id===cur?'on':''}" data-id="${p.id}">${esc(p.name)}
     <small>${p.state==='running'?'● rendering':p.videos+' video'+(p.videos===1?'':'s')}</small></button>`).join('')||'<div class="chipv">No projects yet</div>';
@@ -161,13 +213,15 @@ fetch('/api/presets').then(r=>r.json()).then(ps=>{$('#newtype').innerHTML=ps.map
 $('#newf').onsubmit=async e=>{e.preventDefault();const n=$('#newname').value.trim();if(!n)return;
   const r=await post('/api/projects',{name:n,preset:$('#newtype').value});$('#newname').value='';cur=r.id;await loadList();open(r.id)};
 
-async function open(id){cur=id;try{localStorage.setItem('reelstudio.cur',id)}catch(e){}
+async function open(id){cur=id;VIEW='project';LASTSIG='';document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('on'));try{localStorage.setItem('reelstudio.cur',id)}catch(e){}
   document.querySelectorAll('.proj').forEach(b=>b.classList.toggle('on',b.dataset.id===id));await refresh(true)}
 
 async function refresh(full){
-  if(!cur)return; data=await api('/api/p/'+cur);
+  if(!cur||VIEW!=='project')return; data=await api('/api/p/'+cur);
   if(!data||data.error){cur=null;try{localStorage.removeItem('reelstudio.cur')}catch(e){}$('#main').innerHTML='<p class="muted">Pick a project on the left.</p>';return}
-  if(full||!editing) render();
+  const sig=JSON.stringify(data), playing=[...document.querySelectorAll('video')].some(v=>!v.paused);
+  if(full||(!editing&&!playing&&sig!==LASTSIG)) render();
+  LASTSIG=sig;
   clearTimeout(timer); timer=setTimeout(()=>refresh(false), data.running?2500:8000);
 }
 
@@ -181,17 +235,19 @@ function render(){
   $('#main').innerHTML=`
   <div class="top"><h1>${esc(c.name)}</h1>${pill}<span class="spacer"></span>
     ${d.running?`<button class="btn" id="stop">Stop</button>`:''}
+    <button class="btn small" id="archive" title="Hide this project (the folder is kept in Reels/_archive)">Archive</button>
     <button class="btn" id="repick" ${d.running||!c.video?'disabled':''} title="Let the picker choose reels again">Re-pick reels</button>
     <button class="btn primary" id="go" ${d.running||!c.video?'disabled':''}>${!c.look_ok?'Preview the look':(d.outputs||[]).some(o=>o.url)?'Render changes':'Make the videos'}</button></div>
   ${(st.errors||[]).length?`<p class="err">${st.errors.map(esc).join('<br>')}</p>`:''}
+  ${stepBar(d)}
 
-  <h2>1 · Footage</h2>
+  ${sec('footage','1 · Footage',c.video?'🎬 '+esc(c.video.split('/').pop())+((c.shots||[]).length?` + ${c.shots.length} screenshots`:''):'',!!c.video&&(d.outputs||[]).some(o=>o.url))}
   <div class="drop" id="drop"><b>Drop the video here</b>, plus any screenshots (articles, posts, letters) to show as B-roll.
     <div class="files">${c.video?`<span class="chipv">🎬 ${esc(c.video.split('/').pop())}</span>`:''}${shots}</div>
     <input type="file" id="pick" multiple accept="video/*,image/*" hidden>
     <div style="margin-top:10px"><button class="btn small" id="browse">Choose files</button></div></div>
 
-  <h2>2 · The look</h2>
+  ${sec('look','2 · The look',esc(c.sticker||'')+' · '+({btb:'Books Through Bars',box:'White box',mono:'Typewriter'}[c.cap_style]||''),!!c.look_ok)}
   <div class="card">
     <div class="grid2">
       <div><label class="f">Title card (top of every video)</label><input class="in" data-k="sticker" value="${esc(c.sticker)}" placeholder="Something that stops the scroll">
@@ -213,7 +269,7 @@ function render(){
       <button class="btn small" id="savepreset" title="New projects start from this caption style, end card, link and loudness">Save this look to the preset</button></div>
   </div>
 
-  <h2>3 · Look check</h2>
+  ${sec('check','3 · Look check',c.look_ok?'approved':'',!!c.look_ok)}
   <div class="card look">${d.look?`
     <img src="${d.look}" alt="Stills from the preview video, one per kind of graphic">
     <div class="lookbar">${c.look_ok
@@ -222,14 +278,14 @@ function render(){
         <span class="spacer"></span><button class="btn primary" id="approve" ${d.running?'disabled':''}>Looks good, make the rest</button>`}</div>`
     :`<span class="muted">Press <b>Preview the look</b>. It renders one short video and shows stills of every kind of graphic, so you can check the look before anything else renders.</span>`}</div>
 
-  <h2>4 · B-roll by hand</h2>
+  ${sec('byhand','4 · B-roll by hand',(c.manual_broll||[]).length?(c.manual_broll.length+' placed'):'drag clips onto lines',!(c.manual_broll||[]).length)}
   <div class="card" id="byhand">${c.video?`
     <div class="muted" style="font-size:13px;margin-bottom:8px">Drag a clip onto the line where it should play, from your library below or straight from Finder. It beats the automatic picks. Then press <b>Render changes</b>.</div>
     <div class="tray" id="tray"></div><div class="lines" id="lines"><span class="muted">Loading the transcript…</span></div>`
     :'<span class="muted">Drop the video in first.</span>'}</div>
 
-  <h2>5 · Videos</h2>
-  <div class="legend">${Object.entries({label:'Name label',place:'Place card',emoji:'Emoji',broll:'Screenshot',stock:'Stock footage'}).map(([k,n])=>
+  <h2 id="sec-videos">5 · Videos</h2>
+  <div class="legend">${Object.entries(KINDS).map(([k,n])=>
     `<span><i class="k" style="width:9px;height:9px;border-radius:3px;background:${COLORS[k]}"></i>${n}</span>`).join('')}</div>
   <div class="vids" style="margin-top:12px">${(d.outputs||[]).map(vidCard).join('')||'<div class="chipv">Reels show up here after the first render.</div>'}</div>
 
@@ -237,6 +293,23 @@ function render(){
   wire();
 }
 
+const SEC={}; try{Object.assign(SEC,JSON.parse(localStorage.getItem('reelstudio.sec')||'{}'))}catch(e){}
+function sec(key,title,summary,collapsedByDefault){
+  const col=key in SEC?SEC[key]:collapsedByDefault;
+  return `<h2 class="sec ${col?'collapsed':''}" data-sec="${key}" id="sec-${key}">${title} <small>${summary||''}</small></h2>`}
+function stepBar(d){
+  const c=d.cfg, outs=(d.outputs||[]).filter(o=>o.on), made=outs.filter(o=>o.url).length,
+        posted=outs.filter(o=>Object.entries(o.posting||{}).some(([k,v])=>k!=='note'&&v)).length;
+  const steps=[['footage','Footage',!!c.video,c.video?'Video in':'Drop the video'],
+    ['check','Look',!!c.look_ok,c.look_ok?'Approved':d.look?'Waiting for your OK':'Preview first'],
+    ['videos','Videos',outs.length>0&&made===outs.length,`${made} of ${outs.length} made`],
+    ['post','Post',outs.length>0&&posted===outs.length,`${posted} of ${outs.length} posted`]];
+  const now=steps.findIndex(s=>!s[2]);
+  return `<div class="steps">${steps.map(([k,n,done,sub],i)=>`<button class="step ${done?'done':''} ${i===now?'now':''}" data-jump="${k==='post'?'videos':k}"><b>${n}</b><small>${sub}</small></button>`).join('')}</div>`}
+// transcript time <-> video time, through the dead-air cuts ("a-b,c-d" in transcript seconds)
+const ranges=c=>(c||'').split(',').filter(Boolean).map(r=>r.split('-').map(Number));
+function src2out(s,c){let o=0;for(const [a,b] of ranges(c)){if(s<a)return o;if(s<=b)return o+s-a;o+=b-a}return o}
+function out2src(t,c){let o=0;for(const [a,b] of ranges(c)){if(t<=o+(b-a))return a+(t-o);o+=b-a}return null}
 function vidCard(o){
   const plan=o.plan||[], end=Math.max(1,...plan.map(i=>i.src[1]),
     o.window?parseFloat(o.window.split('-')[1]):1), start=o.window?parseFloat(o.window.split('-')[0]):0;
@@ -252,16 +325,16 @@ function vidCard(o){
   const P=o.posting||{};
   const plat=[['instagram','Instagram'],['facebook','Facebook'],['youtube','YouTube']].map(([k,n])=>
     `<button class="pb ${P[k]?'done':''}" data-post="${k}" data-v="${o.name}">${P[k]?'✓ ':''}${n}${P[k]?' · '+esc(P[k]):''}</button>`).join('');
-  const src=o.phone||o.url;
-  return `<div class="card vid ${o.on?'':'off'} ${WIDE.has(o.name)?'wide':''}">
-    <div class="vhead">${plan.length?`<button class="wbtn" data-wide="${o.name}" title="Stretch this card across the page to edit its timeline">${WIDE.has(o.name)?'Narrow':'⤢ Wide'}</button>`:''}${o.name==='full'?`<b style="flex:1">Full video</b>`:`<input value="${esc(o.tag)}" data-tag="${o.name}" title="Title tag for this reel">
+  const src=o.phone||o.url||o.prev;
+  return `<div class="card vid ${o.on?'':'off'} ${isWide(o)?'wide':''}">
+    <div class="vhead">${plan.length?`<button class="wbtn" data-wide="${o.name}" title="Stretch this card across the page to edit its timeline">${isWide(o)?'Narrow':'⤢ Wide'}</button>`:''}${o.name==='full'?`<b style="flex:1">Full video</b>`:`<input value="${esc(o.tag)}" data-tag="${o.name}" title="Title tag for this reel">
       <label class="sw" title="Make this reel"><input type="checkbox" data-reel="${o.name}" ${o.on?'checked':''}><span></span></label>`}</div>
-    <div class="player">${src?`<video src="${src}#t=0.5" controls preload="metadata" playsinline></video>`:`<div class="ph">${o.on?'Not rendered yet':'Switched off'}</div>`}
-      <div class="meta">${o.window?`<span>From ${fmt(start)} to ${fmt(end)}</span>`:''}
+    <div class="player">${src?`<video src="${src}#t=0.5" data-v="${o.name}" controls preload="metadata" playsinline></video>`:`<div class="ph">${o.on?'Not rendered yet':'Switched off'}</div>`}
+      <div class="meta">${!o.url&&o.prev?`<span class="pill" style="align-self:flex-start">Showing the previous version</span>`:''}${o.window?`<span>From ${fmt(start)} to ${fmt(end)}</span>`:''}
         ${o.url?`<a href="${o.url}?dl=1">Download full quality</a><span>${o.mb} MB · for Instagram upload</span>`:''}
         ${o.phone?`<a href="${o.phone}?dl=1">Download phone copy</a><span>${o.phone_mb} MB · for texting / review</span>`:''}
         <span>${plan.filter(i=>i.on).length} graphics planned</span></div></div>
-    ${plan.length?`<div class="tlwrap"><div class="timeline" data-v="${o.name}" data-start="${start}" data-span="${span}" style="width:${tlW}px;height:${tlH}px;--px5:${PX*5}px">${tl}</div></div>
+    ${plan.length?`<div class="tlwrap"><div class="timeline" data-v="${o.name}" data-start="${start}" data-span="${span}" data-cuts="${esc(o.cuts||'')}" style="width:${tlW}px;height:${tlH}px;--px5:${PX*5}px">${tl}<i class="phl"></i></div></div>
       <div class="tlbar"><span>${fmt(0)}</span><span>Drag a block to move it · drag its edge to stretch it${plan.some(i=>i.moved)?` · <a data-reset="${o.name}">Reset moves</a>`:''}</span><span>${fmt(span)}</span></div>
       <div class="plan">${items}</div>`:''}
     ${o.url?postPanel(o):''}
@@ -290,6 +363,12 @@ function postPanel(o){
   </div>`;
 }
 function label(i){
+  const k=kind(i), skip=/\(skipped/.test(i.why||'')?' (overlaps something, off)':'';
+  if(k==='news')return `📰 ${i.headline||''}${skip}`;
+  if(k==='card')return i.quote&&i.quote.num?`🔢 ${i.quote.num} ${i.quote.label||''}${skip}`:`❝ ${(i.quote||{}).text||''}${skip}`;
+  if(k==='lib')return `🎞 ${(i.image||i.video||'').split('/').pop()}${skip}`;
+  if(k==='hand')return `✋ ${(i.image||i.video||'').split('/').pop()}`;
+  if(k==='stock')return `🎥 stock: ${String(i.id).slice(6)}${skip}`;
   if(i.type==='label')return `${i.name} · ${i.role}`;
   if(i.type==='place')return `📍 ${i.place} ${i.year||''}`;
   if(i.type==='emoji')return `${i.emoji} at ${i.why}`;
@@ -325,6 +404,13 @@ function wire(){
   document.querySelectorAll('[data-note]').forEach(el=>{el.onfocus=()=>editing=true;
     el.onblur=async()=>{editing=false;await post(`/api/p/${cur}/posting`,{video:el.dataset.note,platform:'note',value:el.value})}});
   byHand(data.cfg); timelines(); posts();
+  document.querySelectorAll('h2.sec').forEach(h=>h.onclick=()=>{h.classList.toggle('collapsed');SEC[h.dataset.sec]=h.classList.contains('collapsed');
+    try{localStorage.setItem('reelstudio.sec',JSON.stringify(SEC))}catch(e){}});
+  document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{const h=$('#sec-'+b.dataset.jump);if(!h)return;
+    if(h.classList.contains('collapsed'))h.click(); h.scrollIntoView({behavior:'smooth',block:'start'})});
+  $('#archive').onclick=async()=>{if(!confirm('Archive this project? It leaves the list; the folder is kept in Reels/_archive.'))return;
+    const r=await post(`/api/p/${cur}/archive`); if(r.error)return alert(r.error); cur=null; try{localStorage.removeItem('reelstudio.cur')}catch(e){}
+    $('#main').innerHTML='<div class="empty">Archived.</div>'; loadList()};
   const drop=$('#drop'),pick=$('#pick');
   $('#browse').onclick=()=>pick.click(); pick.onchange=()=>upload([...pick.files]);
   drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
@@ -352,9 +438,12 @@ function posts(){
     await fetch('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:'@anotherparty25',hashtags:v})});
     ACC['@anotherparty25']={hashtags:v};b.textContent='✓ Saved'});
 }
-const WIDE=new Set();
+const WIDE=new Set(); try{JSON.parse(localStorage.getItem('reelstudio.wide')||'[]').forEach(x=>WIDE.add(x))}catch(e){}
+const isWide=o=>WIDE.has(o.name)||(!WIDE.has('!'+o.name)&&(data.outputs||[]).length===1);
 function timelines(){
-  document.querySelectorAll('[data-wide]').forEach(b=>b.onclick=()=>{const n=b.dataset.wide;WIDE.has(n)?WIDE.delete(n):WIDE.add(n);render()});
+  document.querySelectorAll('[data-wide]').forEach(b=>b.onclick=()=>{const n=b.dataset.wide, o={name:n};
+    if(isWide(o)){WIDE.delete(n);WIDE.add('!'+n)}else{WIDE.delete('!'+n);WIDE.add(n)}
+    try{localStorage.setItem('reelstudio.wide',JSON.stringify([...WIDE]))}catch(e){} render()});
   let tip=$('#tltip'); if(!tip){tip=document.createElement('div');tip.id='tltip';tip.className='tltip';document.body.appendChild(tip)}
   document.querySelectorAll('.timeline[data-v]').forEach(tlEl=>{
     const v=tlEl.dataset.v, start=+tlEl.dataset.start, span=+tlEl.dataset.span;
@@ -372,8 +461,19 @@ function timelines(){
         tip.style.display='block'; tip.style.left=ev.clientX+12+'px'; tip.style.top=ev.clientY-30+'px';
         tip.textContent=`${fmt(s-start)} → ${fmt(en-start)}  (${(en-s).toFixed(1)}s)`};
       b.onpointerup=async()=>{b.onpointermove=b.onpointerup=null; b.classList.remove('drag'); tip.style.display='none'; editing=false;
-        if(Math.abs(s-s0)>0.05||Math.abs(en-e0)>0.05){await post(`/api/p/${cur}/move`,{video:v,id:b.dataset.id,s,e:en});refresh(true)}};
+        if(Math.abs(s-s0)>0.05||Math.abs(en-e0)>0.05){await post(`/api/p/${cur}/move`,{video:v,id:b.dataset.id,s,e:en});refresh(true)}
+        else{const vid=document.querySelector(`video[data-v="${v}"]`), cuts=tlEl.dataset.cuts;   // a click: jump the video there
+          if(vid&&cuts){vid.currentTime=Math.max(0,src2out(s0,cuts)-0.3);vid.play()}}};
     });
+  });
+  document.querySelectorAll('.timeline[data-v]').forEach(tlEl=>{
+    const vid=document.querySelector(`video[data-v="${tlEl.dataset.v}"]`), ph=tlEl.querySelector('.phl'), cuts=tlEl.dataset.cuts;
+    if(!vid||!ph||!cuts)return;
+    const start=+tlEl.dataset.start, span=+tlEl.dataset.span, wrap=tlEl.parentElement;
+    vid.ontimeupdate=()=>{const s=out2src(vid.currentTime,cuts); if(s==null){ph.style.display='none';return}
+      ph.style.display='block'; ph.style.left=(s-start)/span*100+'%';
+      const x=(s-start)/span*tlEl.offsetWidth; if(!vid.paused&&(x<wrap.scrollLeft||x>wrap.scrollLeft+wrap.clientWidth-20)) wrap.scrollLeft=x-40};
+    vid.onplay=()=>{LASTVID=vid};
   });
   document.querySelectorAll('[data-reset]').forEach(a=>a.onclick=async()=>{await post(`/api/p/${cur}/move_reset`,{video:a.dataset.reset});refresh(true)});
 }
@@ -418,6 +518,84 @@ async function upload(files){
   }
   refresh(true);
 }
+// ---------- pages: inspiration board, B-roll library, health check ----------
+let VIEW='project';
+function showView(v){VIEW=v;clearTimeout(timer);
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
+  if(v!=='project') document.querySelectorAll('.proj').forEach(b=>b.classList.remove('on'));
+  ({inspiration:inspView,library:libView,health:healthView}[v]||(()=>{}))()}
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>showView(b.dataset.view));
+const putFile=(url,f)=>fetch(url+(url.includes('?')?'&':'?')+'name='+encodeURIComponent(f.name),{method:'PUT',body:f}).then(r=>r.json());
+const PRESETS=fetch('/api/presets').then(r=>r.json());
+
+async function inspView(){
+  const [{items,likes},ps]=await Promise.all([api('/api/inspiration'),PRESETS]); $('#nInsp').textContent=items.length||'';
+  const media=it=>it.file?(it.video?`<video src="/insp/${encodeURIComponent(it.file)}" muted loop playsinline preload="metadata" onmouseenter="this.play()" onmouseleave="this.pause()"></video>`:'')
+    :it.yt?'':`<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)} ↗</a>`;
+  const bg=it=>it.file&&!it.video?`background-image:url('/insp/${encodeURIComponent(it.file)}')`:it.yt?`background-image:url('https://img.youtube.com/vi/${it.yt}/hqdefault.jpg')`:'';
+  $('#main').innerHTML=`<div class="top"><h1>Inspiration</h1><span class="spacer"></span></div>
+    <p class="muted">Reels, screenshots, YouTube links: anything with a look you want. Say what you like about it and pick a project type, and it becomes part of that type's rules. Claude reads those before every project.</p>
+    <div class="drop" id="idrop"><b>Drop screenshots or clips here</b>
+      <div class="addrow"><input class="in" id="iurl" placeholder="…or paste a YouTube / Instagram / TikTok link"><button class="btn dark" id="iadd">Add link</button></div></div>
+    <div class="board">${items.map(it=>`<div class="ins" data-id="${it.id}">
+      <div class="media" style="${bg(it)}">${media(it)}${it.url?`<a href="${esc(it.url)}" target="_blank" rel="noopener" style="position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:7px;font-size:12px;text-decoration:none">Open ↗</a>`:''}
+        <button class="x" data-idel="${it.id}" title="Remove">✕</button></div>
+      <div class="body">
+        <div class="${(it.likes||[]).length||it.note?'':'ask'}"><b style="font-size:12.5px">${(it.likes||[]).length||it.note?'What you like':'What is it you like about this?'}</b>
+          <div class="likes" style="margin-top:6px">${likes.map(l=>`<label><input type="checkbox" data-like="${esc(l)}" ${(it.likes||[]).includes(l)?'checked':''}><span>${esc(l)}</span></label>`).join('')}</div></div>
+        <textarea rows="2" data-inote placeholder="In your words… (e.g. the captions pop on the beat)">${esc(it.note||'')}</textarea>
+        <select data-ipre><option value="">Use for… (pick a project type)</option>${ps.map(p=>`<option value="${p.id}" ${it.preset===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+        <small class="muted">Added ${esc(it.added)}${it.preset&&((it.likes||[]).length||it.note)?' · ✓ in the '+esc((ps.find(p=>p.id===it.preset)||{}).name||it.preset)+' rules':''}</small>
+      </div></div>`).join('')||''}</div>`;
+  const d=$('#idrop'); d.ondragover=e=>{e.preventDefault();d.classList.add('over')}; d.ondragleave=()=>d.classList.remove('over');
+  d.ondrop=async e=>{e.preventDefault();d.classList.remove('over');
+    const url=e.dataTransfer.getData('text/uri-list')||e.dataTransfer.getData('text/plain');
+    if(e.dataTransfer.files.length){d.querySelector('b').textContent='Adding…';for(const f of e.dataTransfer.files) await putFile('/api/inspiration',f)}
+    else if(url) await post('/api/inspiration',{url});
+    inspView()};
+  $('#iadd').onclick=async()=>{const u=$('#iurl').value.trim(); if(!u)return; await post('/api/inspiration',{url:u}); inspView()};
+  document.querySelectorAll('.ins').forEach(card=>{const id=card.dataset.id;
+    const save=async()=>{await post('/api/inspiration',{id,likes:[...card.querySelectorAll('[data-like]:checked')].map(x=>x.dataset.like),
+      note:card.querySelector('[data-inote]').value,preset:card.querySelector('[data-ipre]').value})};
+    card.querySelectorAll('[data-like]').forEach(x=>x.onchange=save);
+    card.querySelector('[data-inote]').onblur=save;
+    card.querySelector('[data-ipre]').onchange=async()=>{await save();inspView()}});
+  document.querySelectorAll('[data-idel]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this from the board?'))return;
+    await post('/api/inspiration',{id:b.dataset.idel,delete:true});inspView()});
+}
+
+async function libView(){
+  const files=await api('/api/library'); LIB=files; $('#nLib').textContent=files.length||'';
+  $('#main').innerHTML=`<div class="top"><h1>B-roll library</h1></div>
+    <p class="muted">Your own photos and clips. A file plays as B-roll when you say its name (or any 4+ letter word in it), ahead of stock footage. Rename a file to change its trigger words. Clips go picture-in-picture, photos slowly zoom or pan.</p>
+    <div class="drop" id="ldrop"><b>Drop photos or clips here</b> to add them to your library.</div>
+    <div class="libgrid">${files.map(f=>`<div class="lf">
+      <div class="m" style="${f.video?'':`background-image:url('/lib/${encodeURIComponent(f.name)}')`}">${f.video?'🎬':''}</div>
+      <input value="${esc(f.name.replace(/\.[^.]+$/,''))}" data-ren="${esc(f.name)}" title="Trigger words: rename to change them">
+      <div class="row"><span>${f.video?'Clip → PiP':'Photo → Ken Burns'}</span><a data-ldel="${esc(f.name)}">Remove</a></div></div>`).join('')}</div>`;
+  const d=$('#ldrop'); d.ondragover=e=>{e.preventDefault();d.classList.add('over')}; d.ondragleave=()=>d.classList.remove('over');
+  d.ondrop=async e=>{e.preventDefault();d.classList.remove('over');d.querySelector('b').textContent='Adding…';
+    for(const f of e.dataTransfer.files) await putFile('/api/library',f); libView()};
+  document.querySelectorAll('[data-ren]').forEach(el=>el.onchange=async()=>{const r=await post('/api/library',{name:el.dataset.ren,rename:el.value});
+    if(r.error)alert(r.error); libView()});
+  document.querySelectorAll('[data-ldel]').forEach(a=>a.onclick=async()=>{if(!confirm('Remove '+a.dataset.ldel+' from the library?'))return;
+    await post('/api/library',{name:a.dataset.ldel,delete:true}); libView()});
+}
+
+async function healthView(){
+  const h=await api('/api/health'), bad=h.checks.filter(c=>!c.ok).length; $('#nHealth').textContent=bad?bad+' ⚠️':'✓';
+  const gb=b=>(b/1e9).toFixed(1)+' GB';
+  $('#main').innerHTML=`<div class="top"><h1>Health check</h1><span class="pill ${bad?'err':'done'}"><span class="dot"></span>${bad?bad+' need attention':'Everything working'}</span></div>
+    <div class="card" style="margin-top:16px">${h.checks.map(c=>`<div class="hc"><span class="ic">${c.ok?'✅':'⚠️'}</span><div style="flex:1"><b>${esc(c.name)}</b><small>${esc(c.detail)}${c.fix?' · '+esc(c.fix):''}</small></div>${c.test?`<button class="btn small" data-test="${c.test}">Test</button>`:''}</div>`).join('')}
+      <div class="hc"><span class="ic">💾</span><div style="flex:1"><b>Storage</b><small>${h.projects} projects use ${gb(h.reels_bytes)}. Kept previous versions of re-rendered videos: ${gb(h.prev_bytes)}.</small></div>
+        ${h.prev_bytes?`<button class="btn small" id="cleanup">Delete previous versions</button>`:''}</div></div>`;
+  document.querySelectorAll('[data-test]').forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent='Testing…';await post('/api/claude_test');healthView()});
+  $('#cleanup')&&($('#cleanup').onclick=async()=>{if(!confirm('Delete all kept previous versions? Current videos stay.'))return;await post('/api/cleanup');healthView()});
+}
+api('/api/health').then(h=>{const bad=h.checks.filter(c=>!c.ok).length;$('#nHealth').textContent=bad?bad+' ⚠️':'✓'});
+api('/api/inspiration').then(r=>$('#nInsp').textContent=r.items.length||'');
+api('/api/library').then(r=>$('#nLib').textContent=r.length||'');
+
 let saved=null; try{saved=localStorage.getItem('reelstudio.cur')}catch(e){}
 if(saved) cur=saved;
 loadList().then(()=>cur&&open(cur));

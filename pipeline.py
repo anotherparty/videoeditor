@@ -18,12 +18,18 @@ Steps per video: dead-air cut -> captions -> autoplan (labels, places, emoji, st
 -> stagereel (face-clear captions, split/full B-roll) -> normalize (speech to reel loudness, limiter) -> phone copy. Each output is skipped if it exists
 unless --force or its plan/settings changed (the dashboard deletes the output when you toggle an item).
 """
-import argparse, json, re, subprocess, sys, time
+import argparse, json, os, re, subprocess, sys, threading, time
 from pathlib import Path
 
 HERE = Path(__file__).parent
 VENV_PY = Path.home() / "Projects/wispr-flow-clone/.venv/bin/python"
 COMPRESS = HERE / "compress.swift"
+
+def jsave(p, obj):
+    """write JSON atomically (temp file + rename) so a reader never sees half a file"""
+    p = Path(p); tmp = p.with_name(f".{p.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    with open(tmp, "w") as fh: json.dump(obj, fh, indent=1, ensure_ascii=False); fh.write("\n")
+    os.replace(tmp, p)
 
 def jload(p, d):
     try: return json.load(open(p))
@@ -39,7 +45,7 @@ class Run:
 
     def say(self, step, job=""):
         self.status.update(step=step, job=job, updated=time.time())
-        json.dump(self.status, open(self.p / "status.json", "w"))
+        jsave(self.p / "status.json", self.status)
         self.log.write(f"[{time.strftime('%H:%M:%S')}] {job} {step}\n"); self.log.flush()
 
     def sh(self, cmd, **kw):
@@ -50,7 +56,11 @@ class Run:
         if r.returncode != 0: raise RuntimeError(f"{Path(str(cmd[1])).name} failed (see work/pipeline.log)")
         return r.stdout
 
-    def save_cfg(self): json.dump(self.cfg, open(self.p / "project.json", "w"), indent=1, ensure_ascii=False)
+    def save_cfg(self, *keys):
+        """write back only the keys this run changed, on top of the file as it is NOW (the dashboard may have edited it)"""
+        cur = jload(self.p / "project.json", None)
+        if cur is None: return                      # unreadable right now: never overwrite with a partial copy
+        cur.update({k: self.cfg[k] for k in keys}); jsave(self.p / "project.json", cur)
 
     def transcript(self):
         src = self.p / self.cfg["video"]; tj = self.work / (src.stem + ".json")
@@ -70,7 +80,7 @@ class Run:
     def pick(self, tj):
         self.say("picking reels")
         reels = json.loads(self.sh(["python3", HERE / "reelpick.py", tj, "--n", "4", "--boost", *self.shot_names()]))
-        self.cfg["reels"] = [dict(r, on=True) for r in reels]; self.save_cfg()
+        self.cfg["reels"] = [dict(r, on=True) for r in reels]; self.save_cfg("reels")
 
     def look_sheet(self, name):
         """contact sheet of the rendered preview: opening frame + the middle of each kind of graphic"""
@@ -98,11 +108,12 @@ class Run:
         mw, mc = (3, 16) if style == "btb" else (6, 30)
         self.say("cutting dead air", name)
         cuts = self.sh(["python3", HERE / "deadair.py", tj, "--gap", "0.7", "--pad", "0.15", *(["--within", window] if window else [])]).strip()
+        (self.work / f"{name}.cuts.txt").write_text(cuts)      # the dashboard maps video time <-> transcript time with this
         self.sh(["python3", HERE / "makecaptions.py", tj, "--cuts", cuts, "--max-words", mw, "--max-chars", mc, "--out", self.work / f"{name}.cues.json"])
         self.say("planning graphics", name)
         shots = [str(self.p / s) for s in self.cfg.get("shots", [])]
         manual = self.work / "manual_broll.json"      # B-roll dragged onto transcript lines in the dashboard
-        json.dump([{**m, "path": str(self.p / m["path"])} for m in self.cfg.get("manual_broll", [])], open(manual, "w"))
+        jsave(manual, [{**m, "path": str(self.p / m["path"])} for m in self.cfg.get("manual_broll", [])])
         self.sh(["python3", HERE / "autoplan.py", tj, "--cuts", cuts, "--work", self.work / "auto", "--out", self.work / f"{name}.beats.json",
                  "--plan", self.work / f"{name}.plan.json", "--off", self.work / f"{name}.off.json", "--manual", manual, "--moves", self.work / f"{name}.moves.json", *(["--shots", *shots] if shots else []),
                  *(["--avoid", *self.cfg["shot_avoid"]] if self.cfg.get("shot_avoid") else [])])
@@ -124,6 +135,12 @@ class Run:
         self.sh(["swift", COMPRESS, out, self.out / "phone" / f"{name}.mp4", "1000000" if name == "full" else "1200000"])
         self.status["done"].append(name)
 
+def notify(title, msg):
+    """Mac notification (renders take minutes; Adam shouldn't have to watch the page)"""
+    q = lambda s: '"' + str(s).replace("\\", "").replace('"', "'") + '"'
+    subprocess.run(["osascript", "-e", f"display notification {q(msg)} with title {q('Reel Studio')} subtitle {q(title)} sound name {q('Glass')}"],
+                   capture_output=True)
+
 def suggest(tj):
     """3-5 short title-card options straight from the transcript (punchy fragments with strong words)."""
     words = [w for s in jload(tj, {"segments": []})["segments"] for w in s.get("words", [])]
@@ -144,7 +161,7 @@ def main():
     try:
         tj = r.transcript()
         if a.suggest:
-            sug = suggest(tj); json.dump(sug, open(r.work / "suggestions.json", "w"), ensure_ascii=False)
+            sug = suggest(tj); jsave(r.work / "suggestions.json", sug)
             print(json.dumps(sug, ensure_ascii=False)); r.status["state"] = "idle"; r.say("ready"); return
         if a.pick or not r.cfg.get("reels"): r.pick(tj)
         jobs = ([("full", "", r.cfg.get("full_tag", "Full video"))] if r.cfg.get("make_full", True) else []) + \
@@ -158,15 +175,18 @@ def main():
             name, win, tag = max(jobs, key=lambda j: (r.kinds(j[0]), -span(j)))
             r.say("rendering the look preview", name)
             r.job(tj, name, win, tag, True); r.look_sheet(name)
-            r.cfg["look_preview"] = name; r.save_cfg()
-            r.status["state"] = "preview ready"; r.say("waiting for your OK on the look"); return
+            r.cfg["look_preview"] = name; r.save_cfg("look_preview")
+            r.status["state"] = "preview ready"; r.say("waiting for your OK on the look")
+            notify(r.cfg.get("name", r.p.name), "Look preview ready, check it in Reel Studio"); return
         for name, win, tag in jobs:
             if a.only and name != a.only: continue
             try: r.job(tj, name, win, tag, a.force or bool(a.only))
             except Exception as ex: r.status["errors"].append(f"{name}: {ex}"); r.log.write(f"ERROR {name}: {ex}\n")
         r.status["state"] = "done" if not r.status["errors"] else "done with errors"; r.say("finished")
+        notify(r.cfg.get("name", r.p.name), "All videos ready" if not r.status["errors"] else "Finished with errors, see the dashboard")
     except Exception as ex:
         r.status["state"] = "failed"; r.status["errors"].append(str(ex)); r.say("failed")
+        notify(r.cfg.get("name", r.p.name), "Render failed: " + str(ex)[:80])
         sys.exit(1)
 
 if __name__ == "__main__": main()

@@ -66,6 +66,28 @@ scrolls sideways, gridline every 5s; "⤢ Wide" stretches the card across the pa
 on, and automatic picks avoid it. "Reset moves" clears them. Positions are transcript time, so a block sits
 slightly off from the rendered video where dead air was cut.
 
+**Post panel (Oct 12 2026).** Under each finished video: ✍️ Write caption (Claude Code CLI, `claude -p`, Adam's
+subscription; prompt = ~/.config/another-party/caption_prompt.md, built from his my-writing-style + ig-caption skills,
+private), editable caption + hashtags (registry/accounts.json default set for @anotherparty25), alt text, flags,
+🖼 Make cover / Another frame (cover.swift, +5s per click), 📋 Copy (server-side pbcopy), ⬇ Video, Open Instagram.
+
+**Overhaul (Oct 12 2026).**
+- Safety: the server only answers requests to localhost, and changes only from the dashboard page (Origin check, blocks
+  other websites and DNS rebinding). All JSON writes are atomic (temp + rename); the pipeline writes back only the keys
+  it changed, so dashboard edits made during a render survive. Re-render keeps the old video in out/_prev/ (shown
+  until the new one exists); Health check can delete them. Jobs run in their own session with work/pipeline.pid, so a
+  dashboard restart neither kills nor forgets a render. Mac notification when a render/preview finishes or fails.
+- Project page: step bar (Footage, Look, Videos, Post) with the next step highlighted; finished sections fold up
+  (click a heading to open; remembered). Timeline playhead follows the video (work/<video>.cuts.txt maps video time to
+  transcript time); click a block to jump there. Spacebar plays/pauses. Archive moves a project to Reels/_archive/.
+  The page only redraws when something changed and never while a video is playing. Every graphic kind has a color.
+- ✨ Inspiration page: drop screenshots/clips or paste links (YouTube shows its thumbnail). Each asks "What is it you
+  like about this?" (captions, colors, pacing, B-roll, text cards, transitions, sound, framing, hook, other + a note)
+  and "Use for…" a project type; that writes a lesson into the preset's notes (removed again if the item is deleted).
+  Stored in ~/Projects/Reels/_inspiration/ (not in this repo).
+- 🎞 Library page: drop files in, rename to change trigger words, remove. 🩺 Health check: Claude signed in (Test
+  button), caption style file, Pixabay key, transcription, disk space, nightly backup, storage + cleanup.
+
 ## Pieces
 
 | file | job |
